@@ -3,9 +3,9 @@ import { db } from '@/lib/db'
 import { User } from '@/types'
 
 export async function GET() {
-  const users = db.prepare(
-    'SELECT id, name, student_id, balance, is_admin, created_at FROM users ORDER BY balance DESC'
-  ).all() as User[]
-
-  return NextResponse.json(users)
+  const res = await db.execute({
+    sql: 'SELECT id, name, student_id, balance, is_admin, created_at FROM users ORDER BY balance DESC',
+    args: [],
+  })
+  return NextResponse.json(res.rows as unknown as User[])
 }

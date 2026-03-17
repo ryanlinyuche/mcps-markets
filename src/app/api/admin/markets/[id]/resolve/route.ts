@@ -17,24 +17,25 @@ export async function POST(
   const resolvedBy = Number(session.sub)
   const notes: string | null = resolution_notes?.trim() || null
 
-  const market = db.prepare('SELECT market_type FROM markets WHERE id = ?').get(Number(id)) as { market_type: string } | undefined
+  const marketRes = await db.execute({ sql: 'SELECT market_type FROM markets WHERE id = ?', args: [Number(id)] })
+  const market = marketRes.rows[0] as unknown as { market_type: string } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
 
   try {
     if (outcome === 'N/A') {
-      resolveMarketNA(Number(id), resolvedBy, notes)
+      await resolveMarketNA(Number(id), resolvedBy, notes)
     } else if (market.market_type === 'score' || market.market_type === 'personal_score') {
       if (!outcome || typeof outcome !== 'string') {
         return NextResponse.json({ error: 'Outcome is required' }, { status: 400 })
       }
-      resolveScoreMarket(Number(id), outcome, resolvedBy, notes)
+      await resolveScoreMarket(Number(id), outcome, resolvedBy, notes)
     } else {
       if (!['YES', 'NO'].includes(outcome)) {
         return NextResponse.json({ error: 'Outcome must be YES or NO' }, { status: 400 })
       }
-      resolveMarket(Number(id), outcome as 'YES' | 'NO', resolvedBy, notes)
+      await resolveMarket(Number(id), outcome as 'YES' | 'NO', resolvedBy, notes)
     }
     return NextResponse.json({ success: true })
   } catch (error) {

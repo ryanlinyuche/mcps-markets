@@ -6,28 +6,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const marketId = Number(id)
 
-  const market = db.prepare('SELECT market_type FROM markets WHERE id = ?').get(Number(id)) as { market_type: string } | undefined
+  const marketRes = await db.execute({ sql: 'SELECT market_type FROM markets WHERE id = ?', args: [marketId] })
+  const market = marketRes.rows[0] as unknown as { market_type: string } | undefined
   if (!market) return NextResponse.json([], { status: 404 })
 
   if (market.market_type === 'score') {
-    const history = db.prepare(`
-      SELECT snapshot, recorded_at
-      FROM market_history
-      WHERE market_id = ? AND snapshot IS NOT NULL
-      ORDER BY recorded_at ASC
-      LIMIT 60
-    `).all(Number(id)) as { snapshot: string; recorded_at: string }[]
-    return NextResponse.json(history)
+    const res = await db.execute({
+      sql: `SELECT snapshot, recorded_at FROM market_history
+            WHERE market_id = ? AND snapshot IS NOT NULL
+            ORDER BY recorded_at ASC LIMIT 60`,
+      args: [marketId],
+    })
+    return NextResponse.json(res.rows as unknown as { snapshot: string; recorded_at: string }[])
   }
 
-  const history = db.prepare(`
-    SELECT yes_pool, no_pool, recorded_at
-    FROM market_history
-    WHERE market_id = ?
-    ORDER BY recorded_at ASC
-    LIMIT 60
-  `).all(Number(id)) as { yes_pool: number; no_pool: number; recorded_at: string }[]
-
-  return NextResponse.json(history)
+  const res = await db.execute({
+    sql: `SELECT yes_pool, no_pool, recorded_at FROM market_history
+          WHERE market_id = ? ORDER BY recorded_at ASC LIMIT 60`,
+    args: [marketId],
+  })
+  return NextResponse.json(res.rows as unknown as { yes_pool: number; no_pool: number; recorded_at: string }[])
 }

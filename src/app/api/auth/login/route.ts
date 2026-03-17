@@ -4,8 +4,6 @@ import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
 const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
-// MCPS's StudentVUE server blocks direct requests (UPD5304-00) but accepts requests
-// from Railway-hosted servers. We route through a Railway proxy that forwards to MCPS.
 const PROXY_URL = 'https://studentvuelibtest.up.railway.app/fulfillAxios'
 
 const escapeXml = (s: string) => s
@@ -21,41 +19,19 @@ function buildSoapXml(studentId: string, password: string, methodName: string, p
 
 async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
   const xml = buildSoapXml(studentId, password, 'StudentInfo', '<Parms></Parms>')
-
   const res = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: DISTRICT_URL, xml }),
   })
-
   if (!res.ok) throw new Error(`Proxy returned ${res.status}`)
-
   const json = await res.json() as { status: boolean; response?: string; message?: string }
-
-  if (!json.status || !json.response) {
-    throw new Error(json.message || 'Proxy error')
-  }
-
+  if (!json.status || !json.response) throw new Error(json.message || 'Proxy error')
   const text = json.response
-
-  // Bad credentials
-  if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) {
-    return { valid: false }
-  }
-
-  // The inner XML is HTML-encoded inside the SOAP envelope — decode it first
-  const decoded = text
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&apos;/g, "'")
-
-  // Log a snippet of the decoded XML to help debug name extraction
-  // Extract student name — FormattedName is a child element, not an attribute
+  if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) return { valid: false }
+  const decoded = text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
   const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim() ||
                decoded.match(/<NickName>([^<]+)<\/NickName>/)?.[1]?.trim()
-
   return { valid: true, name }
 }
 
@@ -67,7 +43,6 @@ function decodeXml(s: string) {
 
 function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
   const periods: ClassPeriodRaw[] = []
-  // Match any element that has a Period attribute and a CourseTitle attribute
   const pattern = /<\w+\b([^>]*?\bPeriod="[^"]*"[^>]*?)(?:\/>|>)/g
   let match: RegExpExecArray | null
   while ((match = pattern.exec(decoded)) !== null) {
@@ -90,7 +65,6 @@ function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
 
 async function fetchAndStoreSchedule(studentId: string, password: string, userId: number): Promise<void> {
   try {
-    // Gradebook reliably returns <Course> elements with Period, Title, StaffName, Room
     const xml = buildSoapXml(studentId, password, 'Gradebook', '<Parms><ReportPeriod></ReportPeriod></Parms>')
     const res = await fetch(PROXY_URL, {
       method: 'POST',
@@ -100,26 +74,19 @@ async function fetchAndStoreSchedule(studentId: string, password: string, userId
     if (!res.ok) { console.log('[schedule] proxy error', res.status); return }
     const json = await res.json() as { status: boolean; response?: string }
     if (!json.status || !json.response) { console.log('[schedule] no response'); return }
-
     const decoded = decodeXml(json.response)
-    console.log('[schedule] snippet:', decoded.slice(0, 600))
-
     const periods = parsePeriodsFromXml(decoded)
     console.log(`[schedule] found ${periods.length} periods for user ${userId}`)
-    if (periods.length === 0) { console.log('[schedule] no periods parsed'); return }
-
-    const upsert = db.prepare(`
-      INSERT INTO user_schedule (user_id, period, course_title, teacher, room, course_code, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(user_id, period) DO UPDATE SET
-        course_title = excluded.course_title,
-        teacher = excluded.teacher,
-        room = excluded.room,
-        course_code = excluded.course_code,
-        updated_at = excluded.updated_at
-    `)
+    if (periods.length === 0) return
     for (const p of periods) {
-      upsert.run(userId, p.period, p.course_title, p.teacher || null, p.room || null, p.course_code || null)
+      await db.execute({
+        sql: `INSERT INTO user_schedule (user_id, period, course_title, teacher, room, course_code, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+              ON CONFLICT(user_id, period) DO UPDATE SET
+                course_title = excluded.course_title, teacher = excluded.teacher,
+                room = excluded.room, course_code = excluded.course_code, updated_at = excluded.updated_at`,
+        args: [userId, p.period, p.course_title, p.teacher || null, p.room || null, p.course_code || null],
+      })
     }
   } catch (err) {
     console.error('[schedule] fetch failed for user', userId, err)
@@ -135,12 +102,10 @@ export async function POST(request: NextRequest) {
     }
 
     const studentId = String(username).trim()
-
     if (!/^\d{6,7}$/.test(studentId)) {
       return NextResponse.json({ error: 'Student ID must be a 6 or 7 digit number' }, { status: 400 })
     }
 
-    // Verify against StudentVUE
     let svResult: { valid: boolean; name?: string }
     try {
       svResult = await verifyStudentVue(studentId, password)
@@ -155,36 +120,35 @@ export async function POST(request: NextRequest) {
 
     const adminId = process.env.ADMIN_STUDENT_ID
     const isAdmin = !!(adminId && studentId === adminId)
-
-    // Upsert user — no password stored, StudentVUE is the source of truth
     const displayName = svResult.name || studentId
-    db.prepare(`
-      INSERT INTO users (student_id, name, is_admin)
-      VALUES (?, ?, ?)
-      ON CONFLICT(student_id) DO UPDATE SET
-        name = excluded.name,
-        is_admin = CASE WHEN excluded.is_admin = 1 THEN 1 ELSE users.is_admin END
-    `).run(studentId, displayName, isAdmin ? 1 : 0)
 
-    const user = db.prepare('SELECT * FROM users WHERE student_id = ?').get(studentId) as User
+    await db.execute({
+      sql: `INSERT INTO users (student_id, name, is_admin) VALUES (?, ?, ?)
+            ON CONFLICT(student_id) DO UPDATE SET
+              name = excluded.name,
+              is_admin = CASE WHEN excluded.is_admin = 1 THEN 1 ELSE users.is_admin END`,
+      args: [studentId, displayName, isAdmin ? 1 : 0],
+    })
 
-    // One-time signup bonus
-    const hasBonus = db.prepare(
-      "SELECT id FROM transactions WHERE user_id = ? AND type = 'signup_bonus'"
-    ).get(user.id)
+    const userRes = await db.execute({ sql: 'SELECT * FROM users WHERE student_id = ?', args: [studentId] })
+    const user = userRes.rows[0] as unknown as User
 
-    if (!hasBonus) {
-      db.prepare(`
-        INSERT INTO transactions (user_id, type, amount, description)
-        VALUES (?, 'signup_bonus', 1000, 'Welcome bonus — 1000 coins to start!')
-      `).run(user.id)
+    const bonusRes = await db.execute({
+      sql: "SELECT id FROM transactions WHERE user_id = ? AND type = 'signup_bonus'",
+      args: [user.id],
+    })
+    if (!bonusRes.rows[0]) {
+      await db.execute({
+        sql: `INSERT INTO transactions (user_id, type, amount, description) VALUES (?, 'signup_bonus', 1000, 'Welcome bonus - 1000 coins to start!')`,
+        args: [user.id],
+      })
     }
 
-    // Fire-and-forget schedule fetch — doesn't delay login
-    fetchAndStoreSchedule(studentId, password, user.id).catch(() => {})
+    // Fire-and-forget schedule fetch
+    fetchAndStoreSchedule(studentId, password, Number(user.id)).catch(() => {})
 
     const token = await signToken({
-      sub: user.id.toString(),
+      sub: String(user.id),
       studentId: user.student_id,
       name: user.name,
       isAdmin: user.is_admin === 1,

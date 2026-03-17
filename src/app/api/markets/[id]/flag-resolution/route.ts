@@ -15,7 +15,8 @@ export async function POST(
   const marketId = Number(id)
   const userId = Number(session.sub)
 
-  const market = db.prepare('SELECT status FROM markets WHERE id = ?').get(marketId) as { status: string } | undefined
+  const marketRes = await db.execute({ sql: 'SELECT status FROM markets WHERE id = ?', args: [marketId] })
+  const market = marketRes.rows[0] as unknown as { status: string } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
@@ -23,19 +24,20 @@ export async function POST(
     return NextResponse.json({ error: 'Market is not open' }, { status: 400 })
   }
 
-  const existing = db.prepare(
-    'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?'
-  ).get(userId, marketId)
+  const existingRes = await db.execute({
+    sql: 'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?',
+    args: [userId, marketId],
+  })
+  const existing = existingRes.rows[0]
 
   if (existing) {
-    db.prepare('DELETE FROM resolution_flags WHERE user_id = ? AND market_id = ?').run(userId, marketId)
+    await db.execute({ sql: 'DELETE FROM resolution_flags WHERE user_id = ? AND market_id = ?', args: [userId, marketId] })
   } else {
-    db.prepare('INSERT INTO resolution_flags (user_id, market_id) VALUES (?, ?)').run(userId, marketId)
+    await db.execute({ sql: 'INSERT INTO resolution_flags (user_id, market_id) VALUES (?, ?)', args: [userId, marketId] })
   }
 
-  const { count } = db.prepare(
-    'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?'
-  ).get(marketId) as { count: number }
+  const countRes = await db.execute({ sql: 'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?', args: [marketId] })
+  const { count } = countRes.rows[0] as unknown as { count: number }
 
   return NextResponse.json({ flagged: !existing, count })
 }

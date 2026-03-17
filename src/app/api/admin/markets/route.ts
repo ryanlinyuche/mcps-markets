@@ -7,14 +7,16 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') || 'pending_approval'
 
-  const markets = db.prepare(`
-    SELECT m.*, u.name as creator_name,
-      (SELECT COUNT(*) FROM resolution_flags rf WHERE rf.market_id = m.id) as flag_count
-    FROM markets m
-    JOIN users u ON m.creator_id = u.id
-    WHERE m.status = ?
-    ORDER BY m.created_at DESC
-  `).all(status) as (Market & { creator_name: string; flag_count: number })[]
+  const res = await db.execute({
+    sql: `SELECT m.*, u.name as creator_name,
+            (SELECT COUNT(*) FROM resolution_flags rf WHERE rf.market_id = m.id) as flag_count
+          FROM markets m
+          JOIN users u ON m.creator_id = u.id
+          WHERE m.status = ?
+          ORDER BY m.created_at DESC`,
+    args: [status],
+  })
+  const markets = res.rows as unknown as (Market & { creator_name: string; flag_count: number })[]
 
   const enriched = markets.map(m => {
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)
@@ -32,7 +34,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const newStatus = action === 'approve' ? 'open' : 'rejected'
-  db.prepare('UPDATE markets SET status = ? WHERE id = ?').run(newStatus, marketId)
+  await db.execute({ sql: 'UPDATE markets SET status = ? WHERE id = ?', args: [newStatus, marketId] })
 
   return NextResponse.json({ success: true, status: newStatus })
 }

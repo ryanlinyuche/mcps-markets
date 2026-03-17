@@ -10,17 +10,18 @@ export async function GET(
 ) {
   const { id } = await params
   const session = await getSession()
+  const marketId = Number(id)
 
-  const market = db.prepare(`
-    SELECT m.*, u.name as creator_name,
-      rb.name as resolved_by_name,
-      su.name as subject_name
-    FROM markets m
-    JOIN users u ON m.creator_id = u.id
-    LEFT JOIN users rb ON m.resolved_by = rb.id
-    LEFT JOIN users su ON m.subject_user_id = su.id
-    WHERE m.id = ?
-  `).get(Number(id)) as (Market & { creator_name: string; resolved_by_name: string | null; subject_name: string | null }) | undefined
+  const marketRes = await db.execute({
+    sql: `SELECT m.*, u.name as creator_name, rb.name as resolved_by_name, su.name as subject_name
+          FROM markets m
+          JOIN users u ON m.creator_id = u.id
+          LEFT JOIN users rb ON m.resolved_by = rb.id
+          LEFT JOIN users su ON m.subject_user_id = su.id
+          WHERE m.id = ?`,
+    args: [marketId],
+  })
+  const market = marketRes.rows[0] as unknown as (Market & { creator_name: string; resolved_by_name: string | null; subject_name: string | null }) | undefined
 
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
@@ -30,28 +31,27 @@ export async function GET(
 
   let optionPools: OptionPool[] | undefined
   if (market.market_type === 'score' || market.market_type === 'personal_score') {
-    optionPools = db.prepare(
-      'SELECT * FROM option_pools WHERE market_id = ? ORDER BY sort_order'
-    ).all(Number(id)) as OptionPool[]
+    const optsRes = await db.execute({ sql: 'SELECT * FROM option_pools WHERE market_id = ? ORDER BY sort_order', args: [marketId] })
+    optionPools = optsRes.rows as unknown as OptionPool[]
   }
 
-  const flagRow = db.prepare(
-    'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?'
-  ).get(Number(id)) as { count: number }
-  const flagCount = flagRow.count
+  const flagRes = await db.execute({ sql: 'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?', args: [marketId] })
+  const flagCount = (flagRes.rows[0] as unknown as { count: number }).count
 
   let userPosition: Position | null = null
   let userFlagged = false
   if (session) {
-    const positions = db.prepare(
-      'SELECT * FROM positions WHERE user_id = ? AND market_id = ?'
-    ).all(Number(session.sub), Number(id)) as Position[]
-    if (positions.length > 0) userPosition = positions[0]
+    const posRes = await db.execute({
+      sql: 'SELECT * FROM positions WHERE user_id = ? AND market_id = ?',
+      args: [Number(session.sub), marketId],
+    })
+    if (posRes.rows[0]) userPosition = posRes.rows[0] as unknown as Position
 
-    const flagged = db.prepare(
-      'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?'
-    ).get(Number(session.sub), Number(id))
-    userFlagged = !!flagged
+    const flaggedRes = await db.execute({
+      sql: 'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?',
+      args: [Number(session.sub), marketId],
+    })
+    userFlagged = !!flaggedRes.rows[0]
   }
 
   return NextResponse.json({

@@ -13,63 +13,69 @@ export const dynamic = 'force-dynamic'
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await getSession()
+  const marketId = Number(id)
 
-  const market = db.prepare(`
-    SELECT m.*, u.name as creator_name, su.name as subject_name
-    FROM markets m
-    JOIN users u ON m.creator_id = u.id
-    LEFT JOIN users su ON m.subject_user_id = su.id
-    WHERE m.id = ?
-  `).get(Number(id)) as (Market & { creator_name: string; subject_name: string | null }) | undefined
-
+  const marketRes = await db.execute({
+    sql: `SELECT m.*, u.name as creator_name, su.name as subject_name
+          FROM markets m
+          JOIN users u ON m.creator_id = u.id
+          LEFT JOIN users su ON m.subject_user_id = su.id
+          WHERE m.id = ?`,
+    args: [marketId],
+  })
+  const market = marketRes.rows[0] as unknown as (Market & { creator_name: string; subject_name: string | null }) | undefined
   if (!market) notFound()
 
   const { yesPrice, noPrice } = computeOdds(market.yes_pool, market.no_pool)
 
   let optionPools: OptionPool[] | undefined
   if (market.market_type === 'score' || market.market_type === 'personal_score') {
-    optionPools = db.prepare(
-      'SELECT * FROM option_pools WHERE market_id = ? ORDER BY sort_order'
-    ).all(Number(id)) as OptionPool[]
+    const optsRes = await db.execute({ sql: 'SELECT * FROM option_pools WHERE market_id = ? ORDER BY sort_order', args: [marketId] })
+    optionPools = optsRes.rows as unknown as OptionPool[]
   }
 
-  const history = market.market_type === 'yesno'
-    ? (db.prepare(
-        'SELECT yes_pool, no_pool, recorded_at FROM market_history WHERE market_id = ? ORDER BY recorded_at ASC LIMIT 60'
-      ).all(Number(id)) as { yes_pool: number; no_pool: number; recorded_at: string }[])
-    : []
+  let history: { yes_pool: number; no_pool: number; recorded_at: string }[] = []
+  if (market.market_type === 'yesno' || market.market_type === 'sports') {
+    const histRes = await db.execute({
+      sql: 'SELECT yes_pool, no_pool, recorded_at FROM market_history WHERE market_id = ? ORDER BY recorded_at ASC LIMIT 60',
+      args: [marketId],
+    })
+    history = histRes.rows as unknown as { yes_pool: number; no_pool: number; recorded_at: string }[]
+  }
 
-  const flagRow = db.prepare(
-    'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?'
-  ).get(Number(id)) as { count: number }
+  const flagRes = await db.execute({ sql: 'SELECT COUNT(*) as count FROM resolution_flags WHERE market_id = ?', args: [marketId] })
+  const flagCount = (flagRes.rows[0] as unknown as { count: number }).count
 
   let userBalance = 0
   let userPositions: Position[] = []
   let userFlagged = false
 
   if (session) {
-    const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(Number(session.sub)) as Pick<User, 'balance'> | undefined
-    userBalance = user?.balance ?? 0
-    userPositions = db.prepare(
-      'SELECT * FROM positions WHERE user_id = ? AND market_id = ?'
-    ).all(Number(session.sub), Number(id)) as Position[]
-    const flagged = db.prepare(
-      'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?'
-    ).get(Number(session.sub), Number(id))
-    userFlagged = !!flagged
+    const userRes = await db.execute({ sql: 'SELECT balance FROM users WHERE id = ?', args: [Number(session.sub)] })
+    userBalance = (userRes.rows[0] as unknown as Pick<User, 'balance'> | undefined)?.balance ?? 0
+    const posRes = await db.execute({
+      sql: 'SELECT * FROM positions WHERE user_id = ? AND market_id = ?',
+      args: [Number(session.sub), marketId],
+    })
+    userPositions = posRes.rows as unknown as Position[]
+    const flaggedRes = await db.execute({
+      sql: 'SELECT 1 FROM resolution_flags WHERE user_id = ? AND market_id = ?',
+      args: [Number(session.sub), marketId],
+    })
+    userFlagged = !!flaggedRes.rows[0]
   }
 
   let resolvedByName: string | null = null
   if (market.resolved_by) {
-    const resolver = db.prepare('SELECT name FROM users WHERE id = ?').get(market.resolved_by) as { name: string } | undefined
-    resolvedByName = resolver?.name ?? null
+    const resolverRes = await db.execute({ sql: 'SELECT name FROM users WHERE id = ?', args: [market.resolved_by] })
+    resolvedByName = (resolverRes.rows[0] as unknown as { name: string } | undefined)?.name ?? null
   }
 
   const enrichedMarket: Market = {
     ...market,
     yes_price: yesPrice,
     no_price: noPrice,
-    flag_count: flagRow.count,
+    flag_count: flagCount,
     user_flagged: userFlagged,
     resolved_by_name: resolvedByName,
     subject_name: market.subject_name ?? null,
@@ -102,7 +108,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         )}
         {market.market_type === 'personal_score' && (
           <p className="text-xs font-medium text-purple-700 bg-purple-50 rounded px-2 py-0.5 w-fit">
-            &#x1F4CA; Personal Score — {market.subject_name ?? 'Unknown'}
+            &#x1F4CA; Personal Score &mdash; {market.subject_name ?? 'Unknown'}
           </p>
         )}
         {market.description && (

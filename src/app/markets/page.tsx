@@ -7,34 +7,34 @@ import { PlusCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default function MarketsPage({ searchParams }: { searchParams: { school?: string } }) {
+export default async function MarketsPage({ searchParams }: { searchParams: { school?: string } }) {
   const schoolFilter = searchParams.school
 
-  const baseQuery = `
+  const baseSql = `
     SELECT m.*, u.name as creator_name, su.name as subject_name
     FROM markets m
     JOIN users u ON m.creator_id = u.id
     LEFT JOIN users su ON m.subject_user_id = su.id
     WHERE m.status = 'open'
   `
-  const markets = (schoolFilter
-    ? db.prepare(baseQuery + ' AND m.school = ? ORDER BY m.created_at DESC').all(schoolFilter)
-    : db.prepare(baseQuery + ' ORDER BY m.created_at DESC').all()
-  ) as (Market & { creator_name: string; subject_name: string | null })[]
+  const marketsRes = schoolFilter
+    ? await db.execute({ sql: baseSql + ' AND m.school = ? ORDER BY m.created_at DESC', args: [schoolFilter] })
+    : await db.execute({ sql: baseSql + ' ORDER BY m.created_at DESC', args: [] })
+  const markets = marketsRes.rows as unknown as (Market & { creator_name: string; subject_name: string | null })[]
 
   const enriched = markets.map(m => {
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)
     return { ...m, yes_price: yesPrice, no_price: noPrice }
   })
 
-  // Attach option_pools for score/personal_score markets
   const scoreIds = enriched.filter(m => m.market_type === 'score' || m.market_type === 'personal_score').map(m => m.id)
   const optionsByMarket: Record<number, OptionPool[]> = {}
   if (scoreIds.length > 0) {
-    const opts = db.prepare(
-      `SELECT * FROM option_pools WHERE market_id IN (${scoreIds.map(() => '?').join(',')}) ORDER BY sort_order`
-    ).all(...scoreIds) as OptionPool[]
-    for (const opt of opts) {
+    const optsRes = await db.execute({
+      sql: `SELECT * FROM option_pools WHERE market_id IN (${scoreIds.map(() => '?').join(',')}) ORDER BY sort_order`,
+      args: scoreIds,
+    })
+    for (const opt of optsRes.rows as unknown as OptionPool[]) {
       if (!optionsByMarket[opt.market_id]) optionsByMarket[opt.market_id] = []
       optionsByMarket[opt.market_id].push(opt)
     }
@@ -44,10 +44,11 @@ export default function MarketsPage({ searchParams }: { searchParams: { school?:
     option_pools: (m.market_type === 'score' || m.market_type === 'personal_score') ? (optionsByMarket[m.id] ?? []) : undefined,
   }))
 
-  // Get distinct schools for filter tabs
-  const schools = (db.prepare(`
-    SELECT DISTINCT school FROM markets WHERE status = 'open' ORDER BY school
-  `).all() as { school: string }[]).map(r => r.school)
+  const schoolsRes = await db.execute({
+    sql: "SELECT DISTINCT school FROM markets WHERE status = 'open' ORDER BY school",
+    args: [],
+  })
+  const schools = (schoolsRes.rows as unknown as { school: string }[]).map(r => r.school)
 
   return (
     <div className="space-y-6">

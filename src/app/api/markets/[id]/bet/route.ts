@@ -20,7 +20,8 @@ export async function POST(
     return NextResponse.json({ error: 'Amount must be at least 1 coin' }, { status: 400 })
   }
 
-  const market = db.prepare('SELECT market_type, closes_at FROM markets WHERE id = ?').get(Number(id)) as { market_type: string; closes_at: string | null } | undefined
+  const marketRes = await db.execute({ sql: 'SELECT market_type, closes_at FROM markets WHERE id = ?', args: [Number(id)] })
+  const market = marketRes.rows[0] as unknown as { market_type: string; closes_at: string | null } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
@@ -29,17 +30,17 @@ export async function POST(
   }
 
   try {
-    if (market.market_type === 'score') {
+    if (market.market_type === 'score' || market.market_type === 'personal_score') {
       if (!side || typeof side !== 'string') {
         return NextResponse.json({ error: 'Option is required' }, { status: 400 })
       }
-      const result = placeScoreBet(Number(session.sub), Number(id), side, coins)
+      const result = await placeScoreBet(Number(session.sub), Number(id), side, coins)
       return NextResponse.json({ success: true, newBalance: result.balance })
     } else {
       if (!['YES', 'NO'].includes(side)) {
         return NextResponse.json({ error: 'Side must be YES or NO' }, { status: 400 })
       }
-      const result = placeBet(Number(session.sub), Number(id), side, coins)
+      const result = await placeBet(Number(session.sub), Number(id), side as 'YES' | 'NO', coins)
       return NextResponse.json({ success: true, newBalance: result.balance })
     }
   } catch (error) {

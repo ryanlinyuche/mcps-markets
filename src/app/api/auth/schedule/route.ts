@@ -7,12 +7,12 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const periods = db.prepare(`
-    SELECT period, course_title, teacher, room, course_code
-    FROM user_schedule
-    WHERE user_id = ?
-    ORDER BY CAST(period AS INTEGER)
-  `).all(Number(session.sub)) as ClassPeriod[]
+  const res = await db.execute({
+    sql: `SELECT period, course_title, teacher, room, course_code
+          FROM user_schedule WHERE user_id = ?
+          ORDER BY CAST(period AS INTEGER)`,
+    args: [Number(session.sub)],
+  })
 
-  return NextResponse.json(periods)
+  return NextResponse.json(res.rows as unknown as ClassPeriod[])
 }

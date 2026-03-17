@@ -13,40 +13,41 @@ export default async function ProfilePage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(session.sub)) as User
+  const userRes = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [Number(session.sub)] })
+  const user = userRes.rows[0] as unknown as User
 
-  // Leaderboard rank
-  const rank = (db.prepare(`
-    SELECT COUNT(*) + 1 AS rank FROM users WHERE balance > ?
-  `).get(user.balance) as { rank: number }).rank
+  const rankRes = await db.execute({ sql: 'SELECT COUNT(*) + 1 AS rank FROM users WHERE balance > ?', args: [user.balance] })
+  const rank = (rankRes.rows[0] as unknown as { rank: number }).rank
 
-  // Positions with market info
-  const positions = db.prepare(`
-    SELECT p.*, m.title as market_title, m.status as market_status, m.outcome as market_outcome
-    FROM positions p
-    JOIN markets m ON p.market_id = m.id
-    WHERE p.user_id = ?
-    ORDER BY p.created_at DESC
-  `).all(user.id) as (Position & { market_title: string; market_status: string; market_outcome: string | null })[]
+  const posRes = await db.execute({
+    sql: `SELECT p.*, m.title as market_title, m.status as market_status, m.outcome as market_outcome
+          FROM positions p
+          JOIN markets m ON p.market_id = m.id
+          WHERE p.user_id = ?
+          ORDER BY p.created_at DESC`,
+    args: [Number(user.id)],
+  })
+  const positions = posRes.rows as unknown as (Position & { market_title: string; market_status: string; market_outcome: string | null })[]
 
-  // Transactions
-  const transactions = db.prepare(`
-    SELECT t.*, m.title as market_title
-    FROM transactions t
-    LEFT JOIN markets m ON t.market_id = m.id
-    WHERE t.user_id = ?
-    ORDER BY t.created_at DESC
-    LIMIT 100
-  `).all(user.id) as (Transaction & { market_title: string | null })[]
+  const txRes = await db.execute({
+    sql: `SELECT t.*, m.title as market_title
+          FROM transactions t
+          LEFT JOIN markets m ON t.market_id = m.id
+          WHERE t.user_id = ?
+          ORDER BY t.created_at DESC
+          LIMIT 100`,
+    args: [Number(user.id)],
+  })
+  const transactions = txRes.rows as unknown as (Transaction & { market_title: string | null })[]
 
-  // Class schedule
-  const schedule = db.prepare(`
-    SELECT period, course_title, teacher, room, course_code
-    FROM user_schedule WHERE user_id = ?
-    ORDER BY CAST(period AS INTEGER)
-  `).all(user.id) as ClassPeriod[]
+  const schedRes = await db.execute({
+    sql: `SELECT period, course_title, teacher, room, course_code
+          FROM user_schedule WHERE user_id = ?
+          ORDER BY CAST(period AS INTEGER)`,
+    args: [Number(user.id)],
+  })
+  const schedule = schedRes.rows as unknown as ClassPeriod[]
 
-  // Win/loss stats
   const resolved = positions.filter(p => p.market_status === 'resolved' && p.market_outcome)
   const wins = resolved.filter(p => p.market_outcome === p.side).length
   const losses = resolved.length - wins
@@ -74,7 +75,6 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statCards.map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-lg border bg-card p-4 space-y-1">
@@ -87,7 +87,6 @@ export default async function ProfilePage() {
         ))}
       </div>
 
-      {/* Class Schedule */}
       <div>
         <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
           <BookOpen size={15} />
@@ -100,7 +99,7 @@ export default async function ProfilePage() {
         </h2>
         {schedule.length === 0 ? (
           <p className="text-muted-foreground text-sm py-4 text-center border rounded-lg">
-            Schedule not loaded yet — log out and back in to sync from StudentVUE.
+            Schedule not loaded yet &mdash; log out and back in to sync from StudentVUE.
           </p>
         ) : (
           <div className="rounded-lg border overflow-hidden">
@@ -128,9 +127,7 @@ export default async function ProfilePage() {
         )}
       </div>
 
-      {/* Tabs via anchor + CSS (server component, no JS needed) */}
       <div className="space-y-4">
-        {/* Positions */}
         <div>
           <h2 className="text-base font-semibold mb-3">
             Positions <span className="text-muted-foreground font-normal text-sm">({positions.length})</span>
@@ -169,7 +166,6 @@ export default async function ProfilePage() {
           )}
         </div>
 
-        {/* Transactions */}
         <div>
           <h2 className="text-base font-semibold mb-3">
             Transaction History <span className="text-muted-foreground font-normal text-sm">({transactions.length})</span>

@@ -9,13 +9,14 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const positions = db.prepare(`
-    SELECT p.*, m.title as market_title, m.status as market_status, m.outcome as market_outcome
-    FROM positions p
-    JOIN markets m ON p.market_id = m.id
-    WHERE p.user_id = ?
-    ORDER BY p.created_at DESC
-  `).all(Number(session.sub)) as (Position & { market_title: string; market_status: string; market_outcome: string | null })[]
+  const res = await db.execute({
+    sql: `SELECT p.*, m.title as market_title, m.status as market_status, m.outcome as market_outcome
+          FROM positions p
+          JOIN markets m ON p.market_id = m.id
+          WHERE p.user_id = ?
+          ORDER BY p.created_at DESC`,
+    args: [Number(session.sub)],
+  })
 
-  return NextResponse.json(positions)
+  return NextResponse.json(res.rows as unknown as (Position & { market_title: string; market_status: string; market_outcome: string | null })[])
 }

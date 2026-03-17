@@ -11,7 +11,7 @@ const SCHEDULE_OPTIONS = [
 function getTodayTitle() {
   const d = new Date()
   const fmt = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' })
-  return `${fmt} — MCPS School Schedule`
+  return `${fmt} - MCPS School Schedule`
 }
 
 function auth(request: NextRequest) {
@@ -19,8 +19,6 @@ function auth(request: NextRequest) {
   return secret === process.env.CRON_SECRET
 }
 
-// POST /api/cron/schedule-market
-// Body: { action: 'create' } | { action: 'resolve', outcome: string }
 export async function POST(request: NextRequest) {
   if (!auth(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,41 +29,44 @@ export async function POST(request: NextRequest) {
   if (action === 'create') {
     const title = getTodayTitle()
 
-    const existing = db.prepare(
-      "SELECT id FROM markets WHERE title = ? AND status IN ('open', 'pending_approval')"
-    ).get(title) as { id: number } | undefined
-
+    const existingRes = await db.execute({
+      sql: "SELECT id FROM markets WHERE title = ? AND status IN ('open', 'pending_approval')",
+      args: [title],
+    })
+    const existing = existingRes.rows[0] as unknown as { id: number } | undefined
     if (existing) {
       return NextResponse.json({ message: 'Market already exists', marketId: existing.id })
     }
 
-    const admin = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get() as { id: number } | undefined
+    const adminRes = await db.execute({ sql: 'SELECT id FROM users WHERE is_admin = 1 LIMIT 1', args: [] })
+    const admin = adminRes.rows[0] as unknown as { id: number } | undefined
     if (!admin) {
       return NextResponse.json({ error: 'No admin user found' }, { status: 500 })
     }
 
-    // Closes at 2:30 PM ET today
     const closes = new Date()
     closes.setHours(14, 30, 0, 0)
 
-    const result = db.prepare(`
-      INSERT INTO markets (title, description, school, market_type, creator_id, status, resolution_criteria, resolution_source, closes_at)
-      VALUES (?, ?, ?, 'score', ?, 'open', ?, ?, ?)
-    `).run(
-      title,
-      'Bet on what type of school day it will be today.',
-      'MCPS',
-      admin.id,
-      'Resolved based on official MCPS announcements. Auto-resolves as Regular Day at 2:30 PM ET if no schedule change is posted.',
-      'https://www.montgomeryschoolsmd.org/emergency/closings/',
-      closes.toISOString()
-    )
+    const insertRes = await db.execute({
+      sql: `INSERT INTO markets (title, description, school, market_type, creator_id, status, resolution_criteria, resolution_source, closes_at)
+            VALUES (?, ?, ?, 'score', ?, 'open', ?, ?, ?)`,
+      args: [
+        title,
+        'Bet on what type of school day it will be today.',
+        'MCPS',
+        admin.id,
+        'Resolved based on official MCPS announcements.',
+        'https://www.montgomeryschoolsmd.org/emergency/closings/',
+        closes.toISOString(),
+      ],
+    })
 
-    const marketId = result.lastInsertRowid as number
+    const marketId = Number(insertRes.lastInsertRowid)
     for (const opt of SCHEDULE_OPTIONS) {
-      db.prepare('INSERT INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)').run(
-        marketId, opt.label, opt.sort_order
-      )
+      await db.execute({
+        sql: 'INSERT INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',
+        args: [marketId, opt.label, opt.sort_order],
+      })
     }
 
     return NextResponse.json({ message: 'Market created', marketId, title })
@@ -77,42 +78,31 @@ export async function POST(request: NextRequest) {
     }
 
     const title = getTodayTitle()
-    const market = db.prepare(
-      "SELECT id FROM markets WHERE title = ? AND status = 'open'"
-    ).get(title) as { id: number } | undefined
-
+    const marketRes = await db.execute({ sql: "SELECT id FROM markets WHERE title = ? AND status = 'open'", args: [title] })
+    const market = marketRes.rows[0] as unknown as { id: number } | undefined
     if (!market) {
-      return NextResponse.json({ error: "No open schedule market found for today" }, { status: 404 })
+      return NextResponse.json({ error: 'No open schedule market found for today' }, { status: 404 })
     }
 
-    const admin = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get() as { id: number } | undefined
-    const adminId = admin?.id ?? 0
+    const adminRes = await db.execute({ sql: 'SELECT id FROM users WHERE is_admin = 1 LIMIT 1', args: [] })
+    const adminId = (adminRes.rows[0] as unknown as { id: number } | undefined)?.id ?? 0
 
-    resolveScoreMarket(
-      market.id,
-      outcome,
-      adminId,
-      `Auto-resolved via MCPS schedule check. Outcome: ${outcome}`
-    )
-
+    await resolveScoreMarket(market.id, outcome, adminId, `Auto-resolved via MCPS schedule check. Outcome: ${outcome}`)
     return NextResponse.json({ message: 'Market resolved', marketId: market.id, outcome })
   }
 
   if (action === 'resolve_na') {
     const title = getTodayTitle()
-    const market = db.prepare(
-      "SELECT id FROM markets WHERE title = ? AND status = 'open'"
-    ).get(title) as { id: number } | undefined
-
+    const marketRes = await db.execute({ sql: "SELECT id FROM markets WHERE title = ? AND status = 'open'", args: [title] })
+    const market = marketRes.rows[0] as unknown as { id: number } | undefined
     if (!market) {
-      return NextResponse.json({ error: "No open schedule market found for today" }, { status: 404 })
+      return NextResponse.json({ error: 'No open schedule market found for today' }, { status: 404 })
     }
 
-    const admin = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get() as { id: number } | undefined
-    const adminId = admin?.id ?? 0
+    const adminRes = await db.execute({ sql: 'SELECT id FROM users WHERE is_admin = 1 LIMIT 1', args: [] })
+    const adminId = (adminRes.rows[0] as unknown as { id: number } | undefined)?.id ?? 0
 
-    resolveMarketNA(market.id, adminId, 'School closed — all bets refunded')
-
+    await resolveMarketNA(market.id, adminId, 'School closed - all bets refunded')
     return NextResponse.json({ message: 'Market resolved N/A (school closed)', marketId: market.id })
   }
 

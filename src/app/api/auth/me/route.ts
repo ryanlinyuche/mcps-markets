@@ -9,7 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(session.sub)) as User | undefined
+  const res = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [Number(session.sub)] })
+  const user = res.rows[0] as unknown as User | undefined
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
