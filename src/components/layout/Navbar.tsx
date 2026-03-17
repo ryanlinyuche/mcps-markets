@@ -11,8 +11,8 @@ export async function Navbar() {
   let balance = 0
 
   if (session) {
-    const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(Number(session.sub)) as Pick<User, 'balance'> | undefined
-    balance = user?.balance ?? 0
+    const res = await db.execute({ sql: 'SELECT balance FROM users WHERE id = ?', args: [Number(session.sub)] })
+    balance = (res.rows[0] as unknown as Pick<User, 'balance'> | undefined)?.balance ?? 0
   }
 
   return (

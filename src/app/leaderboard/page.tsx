@@ -9,9 +9,11 @@ export const dynamic = 'force-dynamic'
 export default async function LeaderboardPage() {
   const session = await getSession()
 
-  const users = db.prepare(
-    'SELECT id, name, balance FROM users ORDER BY balance DESC LIMIT 50'
-  ).all() as Pick<User, 'id' | 'name' | 'balance'>[]
+  const res = await db.execute({
+    sql: 'SELECT id, name, balance FROM users ORDER BY balance DESC LIMIT 50',
+    args: [],
+  })
+  const users = res.rows as unknown as Pick<User, 'id' | 'name' | 'balance'>[]
 
   const medals = ['🥇', '🥈', '🥉']
 

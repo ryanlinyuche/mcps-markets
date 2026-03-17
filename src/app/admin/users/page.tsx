@@ -4,10 +4,12 @@ import { CoinDisplay } from '@/components/shared/CoinDisplay'
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminUsersPage() {
-  const users = db.prepare(
-    'SELECT id, name, student_id, balance, is_admin, created_at FROM users ORDER BY balance DESC'
-  ).all() as User[]
+export default async function AdminUsersPage() {
+  const res = await db.execute({
+    sql: 'SELECT id, name, student_id, balance, is_admin, created_at FROM users ORDER BY balance DESC',
+    args: [],
+  })
+  const users = res.rows as unknown as User[]
 
   return (
     <div className="space-y-4">

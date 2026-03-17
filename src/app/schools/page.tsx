@@ -11,8 +11,8 @@ interface SchoolStats {
   total_markets: number
 }
 
-export default function SchoolsPage() {
-  const schools = db.prepare(`
+export default async function SchoolsPage() {
+  const res = await db.execute(`
     SELECT
       school,
       COUNT(*) FILTER (WHERE status = 'open') AS open_markets,
@@ -22,7 +22,8 @@ export default function SchoolsPage() {
     WHERE status != 'rejected'
     GROUP BY school
     ORDER BY open_markets DESC, total_volume DESC
-  `).all() as SchoolStats[]
+  `)
+  const schools = res.rows as unknown as SchoolStats[]
 
   return (
     <div className="space-y-6">

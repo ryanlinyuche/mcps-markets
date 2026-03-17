@@ -8,41 +8,53 @@ import { School, TrendingUp, Users, PlusCircle, ArrowLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default function SchoolPage({ params }: { params: { school: string } }) {
+export default async function SchoolPage({ params }: { params: { school: string } }) {
   const schoolName = decodeURIComponent(params.school)
 
-  const stats = db.prepare(`
-    SELECT
-      COUNT(*) FILTER (WHERE status = 'open') AS open_markets,
-      COUNT(*) FILTER (WHERE status = 'resolved') AS resolved_markets,
-      COALESCE(SUM(yes_pool + no_pool), 0) AS total_volume
-    FROM markets
-    WHERE school = ? AND status != 'rejected'
-  `).get(schoolName) as { open_markets: number; resolved_markets: number; total_volume: number } | undefined
+  const statsRes = await db.execute({
+    sql: `
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'open') AS open_markets,
+        COUNT(*) FILTER (WHERE status = 'resolved') AS resolved_markets,
+        COALESCE(SUM(yes_pool + no_pool), 0) AS total_volume
+      FROM markets
+      WHERE school = ? AND status != 'rejected'
+    `,
+    args: [schoolName],
+  })
+  const stats = statsRes.rows[0] as unknown as { open_markets: number; resolved_markets: number; total_volume: number } | undefined
 
   if (!stats) notFound()
 
-  const markets = db.prepare(`
-    SELECT m.*, u.name as creator_name
-    FROM markets m
-    JOIN users u ON m.creator_id = u.id
-    WHERE m.school = ? AND m.status = 'open'
-    ORDER BY m.created_at DESC
-  `).all(schoolName) as (Market & { creator_name: string })[]
+  const marketsRes = await db.execute({
+    sql: `
+      SELECT m.*, u.name as creator_name
+      FROM markets m
+      JOIN users u ON m.creator_id = u.id
+      WHERE m.school = ? AND m.status = 'open'
+      ORDER BY m.created_at DESC
+    `,
+    args: [schoolName],
+  })
+  const markets = marketsRes.rows as unknown as (Market & { creator_name: string })[]
 
   const enriched = markets.map(m => {
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)
     return { ...m, yes_price: yesPrice, no_price: noPrice }
   })
 
-  const resolved = db.prepare(`
-    SELECT m.*, u.name as creator_name
-    FROM markets m
-    JOIN users u ON m.creator_id = u.id
-    WHERE m.school = ? AND m.status = 'resolved'
-    ORDER BY m.resolved_at DESC
-    LIMIT 5
-  `).all(schoolName) as (Market & { creator_name: string })[]
+  const resolvedRes = await db.execute({
+    sql: `
+      SELECT m.*, u.name as creator_name
+      FROM markets m
+      JOIN users u ON m.creator_id = u.id
+      WHERE m.school = ? AND m.status = 'resolved'
+      ORDER BY m.resolved_at DESC
+      LIMIT 5
+    `,
+    args: [schoolName],
+  })
+  const resolved = resolvedRes.rows as unknown as (Market & { creator_name: string })[]
 
   return (
     <div className="space-y-6">

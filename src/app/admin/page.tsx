@@ -4,11 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminDashboard() {
-  const pendingCount = (db.prepare("SELECT COUNT(*) as c FROM markets WHERE status = 'pending_approval'").get() as { c: number }).c
-  const openCount = (db.prepare("SELECT COUNT(*) as c FROM markets WHERE status = 'open'").get() as { c: number }).c
-  const resolvedCount = (db.prepare("SELECT COUNT(*) as c FROM markets WHERE status = 'resolved'").get() as { c: number }).c
-  const userCount = (db.prepare("SELECT COUNT(*) as c FROM users").get() as { c: number }).c
+export default async function AdminDashboard() {
+  const [pendingRes, openRes, resolvedRes, userRes] = await Promise.all([
+    db.execute({ sql: "SELECT COUNT(*) as c FROM markets WHERE status = 'pending_approval'", args: [] }),
+    db.execute({ sql: "SELECT COUNT(*) as c FROM markets WHERE status = 'open'", args: [] }),
+    db.execute({ sql: "SELECT COUNT(*) as c FROM markets WHERE status = 'resolved'", args: [] }),
+    db.execute({ sql: 'SELECT COUNT(*) as c FROM users', args: [] }),
+  ])
+
+  const pendingCount = (pendingRes.rows[0] as unknown as { c: number }).c
+  const openCount = (openRes.rows[0] as unknown as { c: number }).c
+  const resolvedCount = (resolvedRes.rows[0] as unknown as { c: number }).c
+  const userCount = (userRes.rows[0] as unknown as { c: number }).c
 
   const stats = [
     { label: 'Pending Approval', value: pendingCount, href: '/admin/markets', color: 'text-yellow-600' },
