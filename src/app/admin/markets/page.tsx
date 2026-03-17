@@ -80,15 +80,22 @@ export default function AdminMarketsPage() {
           ) : (
             open.map(market => (
               <div key={market.id} className="rounded-lg border p-4 flex justify-between items-center gap-4">
-                <div>
-                  <p className="font-semibold">{market.title}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold truncate">{market.title}</p>
+                    {(market.flag_count ?? 0) > 0 && (
+                      <span className="text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5 shrink-0">
+                        🚩 {market.flag_count}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins · YES {Math.round((market.yes_price ?? 0.5) * 100)}% / NO {Math.round((market.no_price ?? 0.5) * 100)}%
+                    Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins · YES {Math.round((market.yes_price ?? 0.5) * 100)}¢ / NO {Math.round((market.no_price ?? 0.5) * 100)}¢
                   </p>
                 </div>
                 <Link
                   href={`/admin/resolve/${market.id}`}
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors"
+                  className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors shrink-0"
                 >
                   Resolve
                 </Link>

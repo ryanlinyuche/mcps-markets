@@ -1,3 +1,11 @@
+export interface ClassPeriod {
+  period: string
+  course_title: string
+  teacher: string | null
+  room: string | null
+  course_code: string | null
+}
+
 export interface User {
   id: number
   student_id: string
@@ -7,14 +15,24 @@ export interface User {
   created_at: string
 }
 
+export interface OptionPool {
+  market_id: number
+  label: string
+  amount: number
+  sort_order: number
+  price?: number
+}
+
 export interface Market {
   id: number
   title: string
   description: string | null
+  school: string
+  market_type: 'yesno' | 'score' | 'personal_score' | 'sports'
   creator_id: number
   creator_name?: string
   status: 'pending_approval' | 'open' | 'rejected' | 'resolved'
-  outcome: 'YES' | 'NO' | null
+  outcome: string | null
   yes_pool: number
   no_pool: number
   closes_at: string | null
@@ -22,6 +40,21 @@ export interface Market {
   resolved_at: string | null
   yes_price?: number
   no_price?: number
+  option_pools?: OptionPool[]
+  resolution_criteria?: string | null
+  resolution_source?: string | null
+  resolution_notes?: string | null
+  resolved_by?: number | null
+  resolved_by_name?: string | null
+  flag_count?: number
+  user_flagged?: boolean
+  resolution_proof?: string | null
+  subject_user_id?: number | null
+  subject_name?: string | null
+  period_class?: string | null
+  sport?: string | null
+  team_a?: string | null
+  team_b?: string | null
 }
 
 export interface Position {
@@ -31,7 +64,7 @@ export interface Position {
   market_title?: string
   market_status?: string
   market_outcome?: string | null
-  side: 'YES' | 'NO'
+  side: string
   coins_bet: number
   created_at: string
 }

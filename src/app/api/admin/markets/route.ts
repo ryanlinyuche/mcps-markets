@@ -8,12 +8,13 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || 'pending_approval'
 
   const markets = db.prepare(`
-    SELECT m.*, u.name as creator_name
+    SELECT m.*, u.name as creator_name,
+      (SELECT COUNT(*) FROM resolution_flags rf WHERE rf.market_id = m.id) as flag_count
     FROM markets m
     JOIN users u ON m.creator_id = u.id
     WHERE m.status = ?
     ORDER BY m.created_at DESC
-  `).all(status) as (Market & { creator_name: string })[]
+  `).all(status) as (Market & { creator_name: string; flag_count: number })[]
 
   const enriched = markets.map(m => {
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)

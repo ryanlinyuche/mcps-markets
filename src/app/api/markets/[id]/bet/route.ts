@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
 import { getSession } from '@/lib/session'
-import { placeBet } from '@/lib/market-math'
+import { placeBet, placeScoreBet } from '@/lib/market-math'
 
 export async function POST(
   request: NextRequest,
@@ -14,18 +15,33 @@ export async function POST(
   const { id } = await params
   const { side, amount } = await request.json()
 
-  if (!['YES', 'NO'].includes(side)) {
-    return NextResponse.json({ error: 'Side must be YES or NO' }, { status: 400 })
-  }
-
   const coins = Math.floor(Number(amount))
   if (!coins || coins < 1) {
     return NextResponse.json({ error: 'Amount must be at least 1 coin' }, { status: 400 })
   }
 
+  const market = db.prepare('SELECT market_type, closes_at FROM markets WHERE id = ?').get(Number(id)) as { market_type: string; closes_at: string | null } | undefined
+  if (!market) {
+    return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+  }
+  if (market.closes_at && new Date(market.closes_at) < new Date()) {
+    return NextResponse.json({ error: 'Betting period has closed for this market' }, { status: 400 })
+  }
+
   try {
-    const result = placeBet(Number(session.sub), Number(id), side, coins)
-    return NextResponse.json({ success: true, newBalance: result.balance })
+    if (market.market_type === 'score') {
+      if (!side || typeof side !== 'string') {
+        return NextResponse.json({ error: 'Option is required' }, { status: 400 })
+      }
+      const result = placeScoreBet(Number(session.sub), Number(id), side, coins)
+      return NextResponse.json({ success: true, newBalance: result.balance })
+    } else {
+      if (!['YES', 'NO'].includes(side)) {
+        return NextResponse.json({ error: 'Side must be YES or NO' }, { status: 400 })
+      }
+      const result = placeBet(Number(session.sub), Number(id), side, coins)
+      return NextResponse.json({ success: true, newBalance: result.balance })
+    }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Failed to place bet'
     return NextResponse.json({ error: msg }, { status: 400 })

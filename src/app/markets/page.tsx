@@ -1,33 +1,60 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { MarketCard } from '@/components/markets/MarketCard'
+import { MarketsListClient } from '@/components/markets/MarketsListClient'
 import { db } from '@/lib/db'
 import { computeOdds } from '@/lib/market-math'
-import { Market } from '@/types'
+import { Market, OptionPool } from '@/types'
 import { PlusCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default function MarketsPage() {
-  const markets = db.prepare(`
-    SELECT m.*, u.name as creator_name
+export default function MarketsPage({ searchParams }: { searchParams: { school?: string } }) {
+  const schoolFilter = searchParams.school
+
+  const baseQuery = `
+    SELECT m.*, u.name as creator_name, su.name as subject_name
     FROM markets m
     JOIN users u ON m.creator_id = u.id
+    LEFT JOIN users su ON m.subject_user_id = su.id
     WHERE m.status = 'open'
-    ORDER BY m.created_at DESC
-  `).all() as (Market & { creator_name: string })[]
+  `
+  const markets = (schoolFilter
+    ? db.prepare(baseQuery + ' AND m.school = ? ORDER BY m.created_at DESC').all(schoolFilter)
+    : db.prepare(baseQuery + ' ORDER BY m.created_at DESC').all()
+  ) as (Market & { creator_name: string; subject_name: string | null })[]
 
   const enriched = markets.map(m => {
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)
     return { ...m, yes_price: yesPrice, no_price: noPrice }
   })
 
+  // Attach option_pools for score/personal_score markets
+  const scoreIds = enriched.filter(m => m.market_type === 'score' || m.market_type === 'personal_score').map(m => m.id)
+  const optionsByMarket: Record<number, OptionPool[]> = {}
+  if (scoreIds.length > 0) {
+    const opts = db.prepare(
+      `SELECT * FROM option_pools WHERE market_id IN (${scoreIds.map(() => '?').join(',')}) ORDER BY sort_order`
+    ).all(...scoreIds) as OptionPool[]
+    for (const opt of opts) {
+      if (!optionsByMarket[opt.market_id]) optionsByMarket[opt.market_id] = []
+      optionsByMarket[opt.market_id].push(opt)
+    }
+  }
+  const withOptions = enriched.map(m => ({
+    ...m,
+    option_pools: (m.market_type === 'score' || m.market_type === 'personal_score') ? (optionsByMarket[m.id] ?? []) : undefined,
+  }))
+
+  // Get distinct schools for filter tabs
+  const schools = (db.prepare(`
+    SELECT DISTINCT school FROM markets WHERE status = 'open' ORDER BY school
+  `).all() as { school: string }[]).map(r => r.school)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Markets</h1>
-          <p className="text-muted-foreground text-sm">{enriched.length} open markets</p>
+          <p className="text-muted-foreground text-sm">{enriched.length} open market{enriched.length !== 1 ? 's' : ''}</p>
         </div>
         <Link
           href="/markets/submit"
@@ -38,18 +65,27 @@ export default function MarketsPage() {
         </Link>
       </div>
 
-      {enriched.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-lg">No open markets yet.</p>
-          <p className="text-sm mt-1">Submit one and the admin will review it!</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {enriched.map(market => (
-            <MarketCard key={market.id} market={market} />
+      {schools.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/markets"
+            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${!schoolFilter ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent'}`}
+          >
+            All Schools
+          </Link>
+          {schools.map(s => (
+            <Link
+              key={s}
+              href={`/markets?school=${encodeURIComponent(s)}`}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${schoolFilter === s ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent'}`}
+            >
+              {s}
+            </Link>
           ))}
         </div>
       )}
+
+      <MarketsListClient initialMarkets={withOptions} schoolFilter={schoolFilter} />
     </div>
   )
 }
