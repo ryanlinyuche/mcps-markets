@@ -53,7 +53,7 @@ export default async function ProfilePage() {
   const losses = resolved.length - wins
   const activePositions = positions.filter(p => p.market_status === 'open').length
 
-  const statCards: { label: string; value: React.ReactNode; icon: React.ComponentType<{ size?: number }> }[] = [
+  const statCards: { label: string; value: React.ReactNode; icon: React.ComponentType<{ size?: number | string }> }[] = [
     { label: 'Balance', value: <CoinDisplay amount={user.balance} />, icon: Coins },
     { label: 'Rank', value: `#${rank}`, icon: Trophy },
     { label: 'Active Bets', value: activePositions, icon: TrendingUp },
