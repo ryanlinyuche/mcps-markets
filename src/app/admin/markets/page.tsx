@@ -15,13 +15,21 @@ export default function AdminMarketsPage() {
   const [loading, setLoading] = useState(true)
 
   async function fetchMarkets() {
-    const [pendingRes, openRes] = await Promise.all([
-      fetch('/api/admin/markets?status=pending_approval'),
-      fetch('/api/admin/markets?status=open'),
-    ])
-    setPending(await pendingRes.json())
-    setOpen(await openRes.json())
-    setLoading(false)
+    try {
+      const [pendingRes, openRes] = await Promise.all([
+        fetch('/api/admin/markets?status=pending_approval'),
+        fetch('/api/admin/markets?status=open'),
+      ])
+      const pendingData = await pendingRes.json()
+      const openData = await openRes.json()
+      setPending(Array.isArray(pendingData) ? pendingData : [])
+      setOpen(Array.isArray(openData) ? openData : [])
+    } catch (e) {
+      console.error('Failed to fetch markets:', e)
+      toast.error('Failed to load markets')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetchMarkets() }, [])
