@@ -65,29 +65,21 @@ function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
   return periods
 }
 
-async function fetchGradebookPeriods(studentId: string, password: string, reportPeriodIndex: number): Promise<ClassPeriodRaw[]> {
-  const xml = buildSoapXml(studentId, password, 'Gradebook', `<Parms><ReportPeriod>${reportPeriodIndex}</ReportPeriod></Parms>`)
-  const res = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: DISTRICT_URL, xml }),
-  })
-  if (!res.ok) return []
-  const json = await res.json() as { status: boolean; response?: string }
-  if (!json.status || !json.response) return []
-  return parsePeriodsFromXml(decodeXml(json.response))
-}
-
 async function fetchAndStoreSchedule(studentId: string, password: string, userId: number): Promise<void> {
   try {
-    // Try semester 2 (index 1) first, fall back to index 0 (semester 1)
-    let periods = await fetchGradebookPeriods(studentId, password, 1)
-    if (periods.length === 0) {
-      periods = await fetchGradebookPeriods(studentId, password, 0)
-    }
+    // StudentClassList returns the actual schedule (not gradebook) — works correctly for semester 2
+    const xml = buildSoapXml(studentId, password, 'StudentClassList', '<Parms></Parms>')
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: DISTRICT_URL, xml }),
+    })
+    if (!res.ok) { console.log('[schedule] proxy error', res.status); return }
+    const json = await res.json() as { status: boolean; response?: string }
+    if (!json.status || !json.response) { console.log('[schedule] no response'); return }
+    const periods = parsePeriodsFromXml(decodeXml(json.response))
     console.log(`[schedule] found ${periods.length} periods for user ${userId}`)
     if (periods.length === 0) return
-    // Clear old schedule before re-inserting so stale classes don't linger
     await db.execute({ sql: 'DELETE FROM user_schedule WHERE user_id = ?', args: [userId] })
     for (const p of periods) {
       await db.execute({
