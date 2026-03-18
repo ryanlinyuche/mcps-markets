@@ -1,5 +1,5 @@
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
+  if (process.env.NEXT_RUNTIME === 'nodejs' && process.env.TURSO_DATABASE_URL) {
     const { db } = await import('@/lib/db')
 
     const tables = [
