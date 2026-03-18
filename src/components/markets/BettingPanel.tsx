@@ -161,7 +161,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium">Amount</label>
-          <span className="text-xs text-muted-foreground">1 coin = $0.01</span>
+          <span className="text-xs text-muted-foreground">Min bet: 1 coin</span>
         </div>
         <div className="flex gap-2">
           <Input
@@ -176,7 +176,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
             Max
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Balance: {userBalance.toLocaleString()} coins (${(userBalance / 100).toFixed(2)})</p>
+        <p className="text-xs text-muted-foreground">Balance: {userBalance.toLocaleString()} coins</p>
       </div>
 
       {coins > 0 && (
@@ -195,7 +195,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
           )}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Potential return</span>
-            <span className="font-medium">{estimatedReturn.toLocaleString()} coins (${(estimatedReturn / 100).toFixed(2)})</span>
+            <span className="font-medium">{estimatedReturn.toLocaleString()} coins</span>
           </div>
           <div className="flex justify-between border-t pt-1 mt-1">
             <span className="text-muted-foreground">Max profit</span>

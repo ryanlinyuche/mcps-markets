@@ -77,8 +77,10 @@ async function fetchAndStoreSchedule(studentId: string, password: string, userId
     if (!res.ok) { console.log('[schedule] proxy error', res.status); return }
     const json = await res.json() as { status: boolean; response?: string }
     if (!json.status || !json.response) { console.log('[schedule] no response'); return }
-    const periods = parsePeriodsFromXml(decodeXml(json.response))
-    console.log(`[schedule] found ${periods.length} periods for user ${userId}`)
+    const decoded = decodeXml(json.response)
+    console.log('[schedule] raw xml sample:', decoded.slice(0, 1000))
+    const periods = parsePeriodsFromXml(decoded)
+    console.log(`[schedule] found ${periods.length} periods for user ${userId}`, periods.map(p => p.period + ':' + p.course_title))
     if (periods.length === 0) return
     await db.execute({ sql: 'DELETE FROM user_schedule WHERE user_id = ?', args: [userId] })
     for (const p of periods) {
