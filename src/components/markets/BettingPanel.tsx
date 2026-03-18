@@ -124,7 +124,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
                 }`}
               >
                 <span>{opt.label}</span>
-                <span className="text-xs text-muted-foreground">{pct}&#162;</span>
+                <span className="text-xs text-muted-foreground">{pct}%</span>
               </button>
             )
           })}
@@ -141,7 +141,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
             }`}
           >
             <div>Buy {yesLabel}</div>
-            <div className="text-xs font-normal opacity-80">{Math.round((market.yes_price ?? 0.5) * 100)}&#162; per share</div>
+            <div className="text-xs font-normal opacity-80">{Math.round((market.yes_price ?? 0.5) * 100)}% chance</div>
           </button>
           <button
             type="button"
@@ -153,7 +153,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
             }`}
           >
             <div>Buy {noLabel}</div>
-            <div className="text-xs font-normal opacity-80">{Math.round((market.no_price ?? 0.5) * 100)}&#162; per share</div>
+            <div className="text-xs font-normal opacity-80">{Math.round((market.no_price ?? 0.5) * 100)}% chance</div>
           </button>
         </div>
       )}
@@ -190,7 +190,7 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
           {!isScore && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Avg price</span>
-              <span className="font-medium">{Math.round(priceCoins)}&#162;/share</span>
+              <span className="font-medium">{Math.round(priceCoins)}% avg odds</span>
             </div>
           )}
           <div className="flex justify-between">

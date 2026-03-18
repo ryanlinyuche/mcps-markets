@@ -119,12 +119,12 @@ export default function ResolvePage() {
           <div>
             <p className="text-sm text-muted-foreground">YES pool</p>
             <CoinDisplay amount={market.yes_pool} size="lg" />
-            <p className="text-sm text-green-600 font-medium mt-1">{Math.round((market.yes_price ?? 0.5) * 100)}&#162;</p>
+            <p className="text-sm text-green-600 font-medium mt-1">{Math.round((market.yes_price ?? 0.5) * 100)}%</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">NO pool</p>
             <CoinDisplay amount={market.no_pool} size="lg" />
-            <p className="text-sm text-red-500 font-medium mt-1">{Math.round((market.no_price ?? 0.5) * 100)}&#162;</p>
+            <p className="text-sm text-red-500 font-medium mt-1">{Math.round((market.no_price ?? 0.5) * 100)}%</p>
           </div>
           <div className="col-span-2 border-t pt-3">
             <p className="text-sm text-muted-foreground">Total wagered</p>

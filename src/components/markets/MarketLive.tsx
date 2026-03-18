@@ -60,7 +60,7 @@ function OddsChart({ history }: { history: HistoryPoint[] }) {
       <div className="flex justify-between items-center">
         <p className="text-xs font-medium text-muted-foreground">YES probability over time</p>
         <span className="text-sm font-bold px-2 py-0.5 rounded-full" style={{ color, background: color + '18' }}>
-          {Math.round(last)}&cent;
+          {Math.round(last)}%
         </span>
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full h-32" preserveAspectRatio="none"
@@ -91,7 +91,7 @@ function OddsChart({ history }: { history: HistoryPoint[] }) {
       <div className="flex justify-between text-xs text-muted-foreground">
         {isPlaceholder
           ? <span className="italic">Chart will appear after the first bet</span>
-          : <><span>Started at {Math.round(first)}&cent;</span><span>{history.length} bets</span></>}
+          : <><span>Started at {Math.round(first)}%</span><span>{history.length} bets</span></>}
       </div>
     </div>
   )
@@ -344,7 +344,7 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
                     style={{ width: `${Math.round((opt.price ?? 0) * 100)}%` }} />
                 </div>
               </div>
-              <span className="text-sm font-semibold w-10 text-right">{Math.round((opt.price ?? 0) * 100)}&cent;</span>
+              <span className="text-sm font-semibold w-10 text-right">{Math.round((opt.price ?? 0) * 100)}%</span>
               <span className="text-xs text-muted-foreground w-16 text-right">{opt.amount.toLocaleString()} coins</span>
             </div>
           ))}

@@ -98,7 +98,7 @@ export default function AdminMarketsPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins · YES {Math.round((market.yes_price ?? 0.5) * 100)}¢ / NO {Math.round((market.no_price ?? 0.5) * 100)}¢
+                    Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins · YES {Math.round((market.yes_price ?? 0.5) * 100)}% / NO {Math.round((market.no_price ?? 0.5) * 100)}%
                   </p>
                 </div>
                 <Link
