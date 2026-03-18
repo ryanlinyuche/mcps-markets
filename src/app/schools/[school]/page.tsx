@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { computeOdds } from '@/lib/market-math'
-import { Market } from '@/types'
+import { Market, OptionPool } from '@/types'
 import { MarketCard } from '@/components/markets/MarketCard'
 import { School, TrendingUp, Users, PlusCircle, ArrowLeft } from 'lucide-react'
 
@@ -42,6 +42,23 @@ export default async function SchoolPage({ params }: { params: { school: string 
     const { yesPrice, noPrice } = computeOdds(m.yes_pool, m.no_pool)
     return { ...m, yes_price: yesPrice, no_price: noPrice }
   })
+
+  const scoreIds = enriched.filter(m => m.market_type === 'score' || m.market_type === 'personal_score').map(m => m.id)
+  const optionsByMarket: Record<number, OptionPool[]> = {}
+  if (scoreIds.length > 0) {
+    const optsRes = await db.execute({
+      sql: `SELECT * FROM option_pools WHERE market_id IN (${scoreIds.map(() => '?').join(',')}) ORDER BY sort_order`,
+      args: scoreIds,
+    })
+    for (const opt of optsRes.rows as unknown as OptionPool[]) {
+      if (!optionsByMarket[opt.market_id]) optionsByMarket[opt.market_id] = []
+      optionsByMarket[opt.market_id].push(opt)
+    }
+  }
+  const withOptions = enriched.map(m => ({
+    ...m,
+    option_pools: (m.market_type === 'score' || m.market_type === 'personal_score') ? (optionsByMarket[m.id] ?? []) : undefined,
+  }))
 
   const resolvedRes = await db.execute({
     sql: `
@@ -97,9 +114,9 @@ export default async function SchoolPage({ params }: { params: { school: string 
       <div>
         <h2 className="text-base font-semibold mb-3">
           Open Markets
-          <span className="text-muted-foreground font-normal text-sm ml-2">({enriched.length})</span>
+          <span className="text-muted-foreground font-normal text-sm ml-2">({withOptions.length})</span>
         </h2>
-        {enriched.length === 0 ? (
+        {withOptions.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground border rounded-lg">
             <p>No open markets for this school yet.</p>
             <p className="text-sm mt-1">
@@ -108,7 +125,7 @@ export default async function SchoolPage({ params }: { params: { school: string 
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {enriched.map(market => (
+            {withOptions.map(market => (
               <MarketCard key={market.id} market={market} />
             ))}
           </div>
