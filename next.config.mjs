@@ -2,8 +2,8 @@
 const nextConfig = {
   experimental: {
     instrumentationHook: true,
+    serverComponentsExternalPackages: ['@libsql/client', 'studentvue'],
   },
-  serverExternalPackages: ['studentvue'],
 };
 
 export default nextConfig;
