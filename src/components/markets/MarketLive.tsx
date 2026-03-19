@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Market, OptionPool } from '@/types'
 import { BettingPanel } from './BettingPanel'
 import { OddsDisplay } from './OddsDisplay'
-import { Flag, CheckCircle, Info, ImagePlus, Clock, Send } from 'lucide-react'
+import { Flag, CheckCircle, Info, ImagePlus, Clock, Send, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 const PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
@@ -145,51 +145,15 @@ function ScoreChart({ history, options }: { history: ScoreHistoryPoint[]; option
 }
 
 function ResolutionInfo({
-  market, isLoggedIn, isCreator, isAdmin, optionPools, onFlagChange, canUploadProof, onProofUploaded, onResolutionRequested,
+  market, isLoggedIn, onFlagChange,
 }: {
   market: Market
   isLoggedIn: boolean
-  isCreator: boolean
-  isAdmin: boolean
-  optionPools?: OptionPool[]
   onFlagChange: (flagged: boolean, count: number) => void
-  canUploadProof: boolean
-  onProofUploaded: (url: string) => void
-  onResolutionRequested: () => void
 }) {
   const [flagging, setFlagging] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null)
-  const [proofFile, setProofFile] = useState<File | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const proofInputRef = useRef<HTMLInputElement>(null)
-
-  const isScore = market.market_type === 'score' || market.market_type === 'personal_score'
-  const outcomeOptions = isScore
-    ? (optionPools?.map(o => o.label) ?? [])
-    : ['YES', 'NO']
-
-  async function handleRequestResolution() {
-    if (!selectedOutcome || !proofFile) return
-    setSubmitting(true)
-    try {
-      const fd = new FormData()
-      fd.append('outcome', selectedOutcome)
-      fd.append('file', proofFile)
-      const res = await fetch(`/api/markets/${market.id}/request-resolution`, { method: 'POST', body: fd })
-      const data = await res.json()
-      if (res.ok) {
-        toast.success('Resolution request submitted — awaiting admin approval')
-        onResolutionRequested()
-      } else {
-        toast.error(data.error || 'Failed to submit request')
-      }
-    } catch {
-      toast.error('Something went wrong')
-    }
-    setSubmitting(false)
-  }
+  const flagCount = market.flag_count ?? 0
+  const userFlagged = market.user_flagged ?? false
 
   async function handleFlag() {
     setFlagging(true)
@@ -204,23 +168,11 @@ function ResolutionInfo({
     setFlagging(false)
   }
 
-  async function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch(`/api/markets/${market.id}/proof`, { method: 'POST', body: fd })
-      const data = await res.json()
-      if (res.ok) { onProofUploaded(data.proof_url); toast.success('Proof uploaded') }
-      else toast.error(data.error || 'Upload failed')
-    } catch { toast.error('Upload failed') }
-    setUploading(false)
-  }
+  const hasInfo = !!(market.resolution_criteria || market.resolution_source)
+  const isResolved = market.status === 'resolved'
+  const isPending = market.status === 'pending_resolution'
 
-  const flagCount = market.flag_count ?? 0
-  const userFlagged = market.user_flagged ?? false
+  if (!hasInfo && !isResolved && !isPending && !isLoggedIn) return null
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
@@ -228,6 +180,7 @@ function ResolutionInfo({
         <Info size={15} className="text-muted-foreground shrink-0" />
         <h3 className="text-sm font-semibold">Resolution Info</h3>
       </div>
+
       {market.resolution_criteria && (
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Criteria</p>
@@ -240,8 +193,9 @@ function ResolutionInfo({
           <p className="text-sm">{market.resolution_source}</p>
         </div>
       )}
-      {market.status === 'resolved' && (
-        <div className="pt-1 border-t space-y-2">
+
+      {isResolved && (
+        <div className={`${hasInfo ? 'pt-1 border-t' : ''} space-y-2`}>
           {market.resolution_notes && (
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Admin Notes</p>
@@ -252,7 +206,7 @@ function ResolutionInfo({
             Resolved{market.resolved_by_name ? ` by ${market.resolved_by_name}` : ''}
             {market.resolved_at ? ` on ${new Date(market.resolved_at).toLocaleDateString('en-US')}` : ''}
           </p>
-          {market.resolution_proof ? (
+          {market.resolution_proof && (
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Proof</p>
               <a href={market.resolution_proof} target="_blank" rel="noopener noreferrer">
@@ -261,75 +215,24 @@ function ResolutionInfo({
               </a>
               <p className="text-xs text-muted-foreground">Click to open full size</p>
             </div>
-          ) : canUploadProof ? (
-            <div className="pt-1">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofUpload} />
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-dashed border-border hover:bg-muted transition-colors text-muted-foreground">
-                <ImagePlus size={12} />
-                {uploading ? 'Uploading...' : 'Add proof screenshot'}
-              </button>
-            </div>
-          ) : null}
-        </div>
-      )}
-      {market.status === 'pending_resolution' && (
-        <div className="pt-1 border-t space-y-2">
-          <div className="rounded-md bg-yellow-50 border border-yellow-200 px-3 py-2 text-sm text-yellow-800 font-medium">
-            Awaiting admin approval &mdash; proposed outcome: <span className="font-bold">{market.pending_outcome}</span>
-          </div>
-          {market.resolution_proof && (
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Submitted Proof</p>
-              <a href={market.resolution_proof} target="_blank" rel="noopener noreferrer">
-                <img src={market.resolution_proof} alt="Resolution proof"
-                  className="rounded-md border max-h-48 w-full object-contain bg-muted hover:opacity-90 transition-opacity cursor-pointer" />
-              </a>
-            </div>
           )}
         </div>
       )}
-      {market.status === 'open' && isLoggedIn && isCreator && (
-        <div className="pt-1 border-t space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Request Resolution</p>
-          <div className="flex flex-wrap gap-2">
-            {outcomeOptions.map(opt => (
-              <button key={opt} onClick={() => setSelectedOutcome(opt === selectedOutcome ? null : opt)}
-                className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors ${
-                  selectedOutcome === opt
-                    ? opt === 'YES' ? 'bg-green-600 text-white border-green-600'
-                    : opt === 'NO' ? 'bg-red-500 text-white border-red-500'
-                    : 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:bg-muted text-muted-foreground'
-                }`}>
-                {opt}
-              </button>
-            ))}
-          </div>
-          {selectedOutcome && (
-            <div className="space-y-2">
-              <input ref={proofInputRef} type="file" accept="image/*" className="hidden"
-                onChange={e => setProofFile(e.target.files?.[0] ?? null)} />
-              <button onClick={() => proofInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-dashed border-border hover:bg-muted transition-colors text-muted-foreground">
-                <ImagePlus size={12} />
-                {proofFile ? proofFile.name : 'Upload proof screenshot'}
-              </button>
-              {proofFile && (
-                <button onClick={handleRequestResolution} disabled={submitting}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
-                  <Send size={12} />
-                  {submitting ? 'Submitting...' : 'Submit for Admin Review'}
-                </button>
-              )}
-            </div>
-          )}
+
+      {isPending && market.resolution_proof && (
+        <div className={`${hasInfo ? 'pt-1 border-t' : ''} space-y-1`}>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Submitted Proof</p>
+          <a href={market.resolution_proof} target="_blank" rel="noopener noreferrer">
+            <img src={market.resolution_proof} alt="Resolution proof"
+              className="rounded-md border max-h-48 w-full object-contain bg-muted hover:opacity-90 transition-opacity cursor-pointer" />
+          </a>
         </div>
       )}
-      {market.status === 'open' && isLoggedIn && !isCreator && (
-        <div className="pt-1 border-t flex items-center justify-between gap-3">
+
+      {market.status === 'open' && isLoggedIn && (
+        <div className={`${hasInfo ? 'pt-1 border-t' : ''} flex items-center justify-between gap-3`}>
           <p className="text-xs text-muted-foreground">
-            {flagCount > 0 ? `${flagCount} user${flagCount !== 1 ? 's' : ''} say this is ready to resolve` : 'Know the outcome? Flag it for resolution.'}
+            {flagCount > 0 ? `${flagCount} user${flagCount !== 1 ? 's' : ''} flagged for resolution` : 'Know the outcome? Flag it for resolution.'}
           </p>
           <button onClick={handleFlag} disabled={flagging}
             className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors shrink-0 ${
@@ -338,6 +241,115 @@ function ResolutionInfo({
             {userFlagged ? <CheckCircle size={12} /> : <Flag size={12} />}
             {userFlagged ? 'Flagged' : 'Flag for Resolution'}
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RequestResolutionPanel({
+  market, optionPools, onResolutionRequested,
+}: {
+  market: Market
+  optionPools?: OptionPool[]
+  onResolutionRequested: () => void
+}) {
+  const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null)
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const proofInputRef = useRef<HTMLInputElement>(null)
+
+  const isScore = market.market_type === 'score' || market.market_type === 'personal_score'
+  const isSports = market.market_type === 'sports'
+  const outcomeOptions = isScore
+    ? (optionPools?.map(o => o.label) ?? [])
+    : isSports && market.team_a && market.team_b
+      ? [market.team_a, market.team_b, 'Draw']
+      : ['YES', 'NO']
+
+  async function handleSubmit() {
+    if (!selectedOutcome || !proofFile) return
+    setSubmitting(true)
+    try {
+      const fd = new FormData()
+      fd.append('outcome', selectedOutcome)
+      fd.append('file', proofFile)
+      const res = await fetch(`/api/markets/${market.id}/request-resolution`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Resolution request submitted — awaiting admin approval')
+        onResolutionRequested()
+      } else {
+        toast.error(data.error || 'Failed to submit')
+      }
+    } catch {
+      toast.error('Something went wrong')
+    }
+    setSubmitting(false)
+  }
+
+  if (market.status === 'pending_resolution') {
+    return (
+      <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={16} className="text-yellow-700 shrink-0" />
+          <p className="text-sm font-semibold text-yellow-900">Resolution Pending Admin Approval</p>
+        </div>
+        <p className="text-sm text-yellow-800">
+          You proposed: <span className="font-bold">{market.pending_outcome}</span>. An admin will review your proof and finalize the resolution.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck size={16} className="text-primary shrink-0" />
+        <p className="text-sm font-semibold">Request Resolution</p>
+        <span className="text-xs text-muted-foreground">(you created this market)</span>
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">1. Select the outcome</p>
+        <div className="flex flex-wrap gap-2">
+          {outcomeOptions.map(opt => (
+            <button key={opt} onClick={() => setSelectedOutcome(opt === selectedOutcome ? null : opt)}
+              className={`px-4 py-2 rounded-md border font-medium text-sm transition-colors ${
+                selectedOutcome === opt
+                  ? opt === 'YES' || opt === market.team_a ? 'bg-green-600 text-white border-green-600'
+                  : opt === 'NO' || opt === market.team_b ? 'bg-red-500 text-white border-red-500'
+                  : 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border hover:bg-muted'
+              }`}>
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedOutcome && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">2. Upload proof (screenshot from your computer)</p>
+          <input ref={proofInputRef} type="file" accept="image/*" className="hidden"
+            onChange={e => setProofFile(e.target.files?.[0] ?? null)} />
+          <button onClick={() => proofInputRef.current?.click()}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm transition-colors ${
+              proofFile
+                ? 'border-green-500 text-green-700 bg-green-50 hover:bg-green-100'
+                : 'border-dashed border-border hover:bg-muted text-muted-foreground'
+            }`}>
+            <ImagePlus size={15} />
+            {proofFile ? proofFile.name : 'Choose image file'}
+          </button>
+
+          {proofFile && (
+            <button onClick={handleSubmit} disabled={submitting}
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50">
+              <Send size={15} />
+              {submitting ? 'Submitting...' : 'Submit for Admin Review'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -392,23 +404,14 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
     router.refresh()
   }
 
-  function handleFlagChange(flagged: boolean, count: number) {
-    setMarket(prev => ({ ...prev, user_flagged: flagged, flag_count: count }))
-  }
-
-  function handleProofUploaded(url: string) {
-    setMarket(prev => ({ ...prev, resolution_proof: url }))
-  }
-
   const yesPrice = market.yes_price ?? (market.yes_pool / (market.yes_pool + market.no_pool) || 0.5)
   const noPrice = market.no_price ?? (market.no_pool / (market.yes_pool + market.no_pool) || 0.5)
   const displayedOptionPools = isScore && optionPools
     ? computeScoreOdds(optionPools).map(o => ({ ...o, market_id: initialMarket.id }))
     : optionPools
-  const showResolutionInfo = !!(market.resolution_criteria || market.resolution_source || market.status === 'resolved' || market.status === 'pending_resolution' || (market.status === 'open' && isLoggedIn))
-  const canUploadProof = (isCreator || isAdmin) && market.status === 'resolved'
   const bettingClosed = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) < new Date()
   const optionLabels = optionPools?.map(o => o.label) ?? []
+  const showCreatorPanel = isCreator && (market.status === 'open' || market.status === 'pending_resolution')
 
   return (
     <>
@@ -420,6 +423,7 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
           </p>
         </div>
       )}
+
       {isScore && displayedOptionPools ? (
         <div className="rounded-lg border divide-y">
           {displayedOptionPools.map(opt => (
@@ -454,16 +458,16 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
         </div>
       )}
 
-      {showResolutionInfo && (
-        <ResolutionInfo
+      <ResolutionInfo
+        market={market}
+        isLoggedIn={isLoggedIn}
+        onFlagChange={(flagged, count) => setMarket(prev => ({ ...prev, user_flagged: flagged, flag_count: count }))}
+      />
+
+      {showCreatorPanel && (
+        <RequestResolutionPanel
           market={market}
-          isLoggedIn={isLoggedIn}
-          isCreator={isCreator}
-          isAdmin={isAdmin}
           optionPools={optionPools}
-          onFlagChange={handleFlagChange}
-          canUploadProof={canUploadProof}
-          onProofUploaded={handleProofUploaded}
           onResolutionRequested={refetch}
         />
       )}

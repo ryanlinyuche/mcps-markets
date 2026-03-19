@@ -31,7 +31,7 @@ export async function Navbar() {
             <Link href="/schools" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Schools
             </Link>
-            <Link href="/markets?school=Sports" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
+            <Link href="/markets/sports" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Sports
             </Link>
             <Link href="/leaderboard" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
