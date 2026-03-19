@@ -380,7 +380,7 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
     : optionPools
   const bettingClosed = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) < new Date()
   const optionLabels = optionPools?.map(o => o.label) ?? []
-  const showResolutionPanel = isLoggedIn && !isAdmin && (
+  const showResolutionPanel = isLoggedIn && (
     market.status === 'open' || (isCreator && market.status === 'pending_resolution')
   )
 
