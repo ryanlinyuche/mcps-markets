@@ -20,17 +20,3 @@ export const db = new Proxy({} as Client, {
     return (getDb() as never)[prop]
   },
 })
-src/instrumentation.ts — change line 2 from:
-if (process.env.NEXT_RUNTIME === 'nodejs') {
-to:
-if (process.env.NEXT_RUNTIME === 'nodejs' && process.env.TURSO_DATABASE_URL) {
-next.config.mjs — full file:
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
-  serverExternalPackages: ['studentvue'],
-};
-
-export default nextConfig;

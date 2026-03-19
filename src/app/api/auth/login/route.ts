@@ -6,7 +6,6 @@ import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
 const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
-const PROXY_URL = 'https://studentvuelibtest.up.railway.app/fulfillAxios'
 
 const escapeXml = (s: string) => s
   .replace(/&/g, '&amp;')
@@ -19,17 +18,25 @@ function buildSoapXml(studentId: string, password: string, methodName: string, p
   return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
 }
 
-async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
-  const xml = buildSoapXml(studentId, password, 'StudentInfo', '<Parms></Parms>')
-  const res = await fetch(PROXY_URL, {
+async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
+  const xml = buildSoapXml(studentId, password, methodName, paramStr)
+  const res = await fetch(DISTRICT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: DISTRICT_URL, xml }),
+    headers: {
+      'Content-Type': 'text/xml; charset=utf-8',
+      'SOAPAction': '"http://edupoint.com/webservices/ProcessWebServiceRequestMultiWeb"',
+    },
+    body: xml,
   })
-  if (!res.ok) throw new Error(`Proxy returned ${res.status}`)
-  const json = await res.json() as { status: boolean; response?: string; message?: string }
-  if (!json.status || !json.response) throw new Error(json.message || 'Proxy error')
-  const text = json.response
+  if (!res.ok) throw new Error(`District returned ${res.status}`)
+  const text = await res.text()
+  const result = text.match(/<ProcessWebServiceRequestMultiWebResult>([\s\S]*?)<\/ProcessWebServiceRequestMultiWebResult>/)?.[1]
+  if (!result) throw new Error('Invalid SOAP response')
+  return result
+}
+
+async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
+  const text = await callDistrict(studentId, password, 'StudentInfo', '<Parms></Parms>')
   if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) return { valid: false }
   const decoded = text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
   const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim() ||
@@ -68,16 +75,8 @@ function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
 async function fetchAndStoreSchedule(studentId: string, password: string, userId: number): Promise<void> {
   try {
     // StudentClassList returns the actual schedule (not gradebook) — works correctly for semester 2
-    const xml = buildSoapXml(studentId, password, 'StudentClassList', '<Parms></Parms>')
-    const res = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: DISTRICT_URL, xml }),
-    })
-    if (!res.ok) { console.log('[schedule] proxy error', res.status); return }
-    const json = await res.json() as { status: boolean; response?: string }
-    if (!json.status || !json.response) { console.log('[schedule] no response'); return }
-    const decoded = decodeXml(json.response)
+    const result = await callDistrict(studentId, password, 'StudentClassList', '<Parms></Parms>')
+    const decoded = decodeXml(result)
     console.log('[schedule] raw xml sample:', decoded.slice(0, 1000))
     const periods = parsePeriodsFromXml(decoded)
     console.log(`[schedule] found ${periods.length} periods for user ${userId}`, periods.map(p => p.period + ':' + p.course_title))
