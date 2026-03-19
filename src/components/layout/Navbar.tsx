@@ -18,14 +18,14 @@ export async function Navbar() {
   return (
     <nav className="border-b bg-background sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href={session ? '/markets' : '/'} className="flex items-center gap-2 font-bold text-lg">
+        <Link href={session ? '/markets/ongoing' : '/'} className="flex items-center gap-2 font-bold text-lg">
           <TrendingUp size={22} className="text-green-600" />
           <span>MCPS Markets</span>
         </Link>
 
         {session ? (
           <div className="flex items-center gap-4">
-            <Link href="/markets" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
+            <Link href="/markets/ongoing" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Markets
             </Link>
             <Link href="/schools" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
