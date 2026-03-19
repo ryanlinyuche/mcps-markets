@@ -8,19 +8,43 @@ import { Market, OptionPool } from '@/types'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const tab = searchParams.get('tab')
   const status = searchParams.get('status') || 'open'
   const school = searchParams.get('school')
+  const userId = searchParams.get('userId')
+  const betOnly = searchParams.get('betOnly') === 'true'
 
-  let sql = `
+  const base = `
     SELECT m.*, u.name as creator_name, su.name as subject_name
     FROM markets m
     JOIN users u ON m.creator_id = u.id
     LEFT JOIN users su ON m.subject_user_id = su.id
-    WHERE m.status = ?
   `
-  const args: (string | number | null)[] = [status]
-  if (school) { sql += ' AND m.school = ?'; args.push(school) }
-  sql += ' ORDER BY m.created_at DESC'
+
+  let sql: string
+  const args: (string | number | null)[] = []
+
+  if (tab === 'yours' && userId) {
+    sql = base + `WHERE m.creator_id = ? AND m.status NOT IN ('rejected') ORDER BY m.created_at DESC`
+    args.push(Number(userId))
+  } else if (tab === 'ongoing') {
+    sql = base + `WHERE m.status = 'open' AND (m.closes_at IS NULL OR m.closes_at > datetime('now')) ORDER BY m.created_at DESC`
+  } else if (tab === 'closed') {
+    sql = base + `WHERE (m.status = 'open' AND m.closes_at IS NOT NULL AND m.closes_at <= datetime('now')) OR m.status = 'pending_resolution' ORDER BY m.closes_at DESC`
+  } else if (tab === 'resolved') {
+    if (betOnly && userId) {
+      sql = base + `JOIN positions p ON p.market_id = m.id WHERE m.status = 'resolved' AND p.user_id = ? ORDER BY m.resolved_at DESC`
+      args.push(Number(userId))
+    } else {
+      sql = base + `WHERE m.status = 'resolved' ORDER BY m.resolved_at DESC`
+    }
+  } else {
+    // Legacy ?status= support (used by admin pages)
+    sql = base + `WHERE m.status = ?`
+    args.push(status)
+    if (school) { sql += ' AND m.school = ?'; args.push(school) }
+    sql += ' ORDER BY m.created_at DESC'
+  }
 
   const marketsRes = await db.execute({ sql, args })
   const markets = marketsRes.rows as unknown as (Market & { creator_name: string; subject_name: string | null })[]

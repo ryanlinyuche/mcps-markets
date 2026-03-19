@@ -40,8 +40,14 @@ interface MarketCardProps {
 const statusColors: Record<string, string> = {
   open: 'bg-green-100 text-green-800',
   pending_approval: 'bg-yellow-100 text-yellow-800',
+  pending_resolution: 'bg-yellow-100 text-yellow-800',
   resolved: 'bg-gray-100 text-gray-700',
   rejected: 'bg-red-100 text-red-700',
+}
+
+const statusLabels: Record<string, string> = {
+  pending_approval: 'Pending',
+  pending_resolution: 'Pending Resolution',
 }
 
 export function MarketCard({ market }: MarketCardProps) {
@@ -58,7 +64,7 @@ export function MarketCard({ market }: MarketCardProps) {
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-base leading-snug">{market.title}</CardTitle>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${statusColors[market.status] || ''}`}>
-              {market.status === 'pending_approval' ? 'Pending' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
+              {statusLabels[market.status] ?? (market.status.charAt(0).toUpperCase() + market.status.slice(1))}
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
