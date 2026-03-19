@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Market, OptionPool } from '@/types'
 import { BettingPanel } from './BettingPanel'
 import { OddsDisplay } from './OddsDisplay'
-import { Flag, CheckCircle, Info, ImagePlus, Clock, Send, ShieldCheck } from 'lucide-react'
+import { Info, ImagePlus, Clock, Send, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 const PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
@@ -145,34 +145,15 @@ function ScoreChart({ history, options }: { history: ScoreHistoryPoint[]; option
 }
 
 function ResolutionInfo({
-  market, isLoggedIn, onFlagChange,
+  market,
 }: {
   market: Market
-  isLoggedIn: boolean
-  onFlagChange: (flagged: boolean, count: number) => void
 }) {
-  const [flagging, setFlagging] = useState(false)
-  const flagCount = market.flag_count ?? 0
-  const userFlagged = market.user_flagged ?? false
-
-  async function handleFlag() {
-    setFlagging(true)
-    try {
-      const res = await fetch(`/api/markets/${market.id}/flag-resolution`, { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        onFlagChange(data.flagged, data.count)
-        toast.success(data.flagged ? 'Flagged for resolution' : 'Flag removed')
-      }
-    } catch { /* silent */ }
-    setFlagging(false)
-  }
-
   const hasInfo = !!(market.resolution_criteria || market.resolution_source)
   const isResolved = market.status === 'resolved'
   const isPending = market.status === 'pending_resolution'
 
-  if (!hasInfo && !isResolved && !isPending && !isLoggedIn) return null
+  if (!hasInfo && !isResolved && !isPending) return null
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
@@ -228,30 +209,16 @@ function ResolutionInfo({
           </a>
         </div>
       )}
-
-      {market.status === 'open' && isLoggedIn && (
-        <div className={`${hasInfo ? 'pt-1 border-t' : ''} flex items-center justify-between gap-3`}>
-          <p className="text-xs text-muted-foreground">
-            {flagCount > 0 ? `${flagCount} user${flagCount !== 1 ? 's' : ''} flagged for resolution` : 'Know the outcome? Flag it for resolution.'}
-          </p>
-          <button onClick={handleFlag} disabled={flagging}
-            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors shrink-0 ${
-              userFlagged ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100' : 'border-border hover:bg-muted text-muted-foreground'
-            }`}>
-            {userFlagged ? <CheckCircle size={12} /> : <Flag size={12} />}
-            {userFlagged ? 'Flagged' : 'Flag for Resolution'}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
 
 function RequestResolutionPanel({
-  market, optionPools, onResolutionRequested,
+  market, optionPools, isCreator, onResolutionRequested,
 }: {
   market: Market
   optionPools?: OptionPool[]
+  isCreator: boolean
   onResolutionRequested: () => void
 }) {
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null)
@@ -296,7 +263,7 @@ function RequestResolutionPanel({
           <p className="text-sm font-semibold text-yellow-900">Resolution Pending Admin Approval</p>
         </div>
         <p className="text-sm text-yellow-800">
-          You proposed: <span className="font-bold">{market.pending_outcome}</span>. An admin will review your proof and finalize the resolution.
+          Proposed outcome: <span className="font-bold">{market.pending_outcome}</span>. An admin will review the proof and finalize the resolution.
         </p>
       </div>
     )
@@ -307,7 +274,9 @@ function RequestResolutionPanel({
       <div className="flex items-center gap-2">
         <ShieldCheck size={16} className="text-primary shrink-0" />
         <p className="text-sm font-semibold">Request Resolution</p>
-        <span className="text-xs text-muted-foreground">(you created this market)</span>
+        <span className="text-xs text-muted-foreground">
+          {isCreator ? '(you created this market)' : 'Know the outcome? Upload proof for admin review.'}
+        </span>
       </div>
 
       <div className="space-y-1">
@@ -411,7 +380,9 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
     : optionPools
   const bettingClosed = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) < new Date()
   const optionLabels = optionPools?.map(o => o.label) ?? []
-  const showCreatorPanel = isCreator && (market.status === 'open' || market.status === 'pending_resolution')
+  const showResolutionPanel = isLoggedIn && !isAdmin && (
+    market.status === 'open' || (isCreator && market.status === 'pending_resolution')
+  )
 
   return (
     <>
@@ -458,16 +429,13 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
         </div>
       )}
 
-      <ResolutionInfo
-        market={market}
-        isLoggedIn={isLoggedIn}
-        onFlagChange={(flagged, count) => setMarket(prev => ({ ...prev, user_flagged: flagged, flag_count: count }))}
-      />
+      <ResolutionInfo market={market} />
 
-      {showCreatorPanel && (
+      {showResolutionPanel && (
         <RequestResolutionPanel
           market={market}
           optionPools={optionPools}
+          isCreator={isCreator}
           onResolutionRequested={refetch}
         />
       )}

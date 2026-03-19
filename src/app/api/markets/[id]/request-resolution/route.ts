@@ -23,7 +23,6 @@ export async function POST(
   })
   const market = marketRes.rows[0] as unknown as Pick<Market, 'creator_id' | 'status' | 'market_type'> | undefined
   if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
-  if (market.creator_id !== userId) return NextResponse.json({ error: 'Only the market creator can request resolution' }, { status: 403 })
   if (market.status !== 'open') return NextResponse.json({ error: 'Market must be open to request resolution' }, { status: 400 })
 
   const formData = await request.formData()
