@@ -17,6 +17,8 @@ function getDb(): Client {
 
 export const db = new Proxy({} as Client, {
   get(_target, prop) {
-    return (getDb() as never)[prop]
+    const client = getDb()
+    const value = (client as never)[prop as string]
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(client) : value
   },
 })
