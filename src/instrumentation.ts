@@ -96,5 +96,14 @@ export async function register() {
     for (const sql of tables) {
       await db.execute(sql)
     }
+
+    // Add columns for creator resolution request flow (ignore if already exist)
+    const alterStatements = [
+      `ALTER TABLE markets ADD COLUMN pending_outcome TEXT`,
+      `ALTER TABLE markets ADD COLUMN resolution_requested_by INTEGER REFERENCES users(id)`,
+    ]
+    for (const sql of alterStatements) {
+      try { await db.execute(sql) } catch { /* column already exists */ }
+    }
   }
 }

@@ -12,18 +12,22 @@ export default function AdminMarketsPage() {
   const router = useRouter()
   const [pending, setPending] = useState<(Market & { creator_name: string })[]>([])
   const [open, setOpen] = useState<(Market & { creator_name: string })[]>([])
+  const [pendingResolution, setPendingResolution] = useState<(Market & { creator_name: string })[]>([])
   const [loading, setLoading] = useState(true)
 
   async function fetchMarkets() {
     try {
-      const [pendingRes, openRes] = await Promise.all([
+      const [pendingRes, openRes, pendingResolutionRes] = await Promise.all([
         fetch('/api/admin/markets?status=pending_approval'),
         fetch('/api/admin/markets?status=open'),
+        fetch('/api/admin/markets?status=pending_resolution'),
       ])
       const pendingData = await pendingRes.json()
       const openData = await openRes.json()
+      const pendingResolutionData = await pendingResolutionRes.json()
       setPending(Array.isArray(pendingData) ? pendingData : [])
       setOpen(Array.isArray(openData) ? openData : [])
+      setPendingResolution(Array.isArray(pendingResolutionData) ? pendingResolutionData : [])
     } catch (e) {
       console.error('Failed to fetch markets:', e)
       toast.error('Failed to load markets')
@@ -52,9 +56,17 @@ export default function AdminMarketsPage() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="pending">
+      <Tabs defaultValue={pendingResolution.length > 0 ? 'resolution' : 'pending'}>
         <TabsList>
           <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
+          <TabsTrigger value="resolution">
+            Resolution Requests
+            {pendingResolution.length > 0 && (
+              <span className="ml-1.5 bg-yellow-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 leading-none">
+                {pendingResolution.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="open">Open ({open.length})</TabsTrigger>
         </TabsList>
 
@@ -77,6 +89,29 @@ export default function AdminMarketsPage() {
                     Reject
                   </Button>
                 </div>
+              </div>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="resolution" className="mt-4 space-y-3">
+          {pendingResolution.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-6">No pending resolution requests.</p>
+          ) : (
+            pendingResolution.map(market => (
+              <div key={market.id} className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 flex justify-between items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">{market.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    By {market.creator_name} · Proposed: <span className="font-medium text-yellow-800">{market.pending_outcome}</span>
+                  </p>
+                </div>
+                <Link
+                  href={`/admin/resolve/${market.id}`}
+                  className="inline-flex items-center justify-center rounded-md border border-yellow-400 bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800 hover:bg-yellow-200 transition-colors shrink-0"
+                >
+                  Review
+                </Link>
               </div>
             ))
           )}

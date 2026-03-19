@@ -84,6 +84,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const statusBadge = {
     open: 'bg-green-100 text-green-800',
     pending_approval: 'bg-yellow-100 text-yellow-800',
+    pending_resolution: 'bg-yellow-100 text-yellow-800',
     resolved: 'bg-gray-100 text-gray-700',
     rejected: 'bg-red-100 text-red-700',
   }[market.status] || ''
@@ -98,7 +99,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         <div className="flex items-start gap-2 flex-wrap">
           <h1 className="text-xl font-bold flex-1">{market.title}</h1>
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusBadge}`}>
-            {market.status === 'pending_approval' ? 'Pending' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
+            {market.status === 'pending_approval' ? 'Pending' : market.status === 'pending_resolution' ? 'Pending Resolution' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
           </span>
         </div>
         {market.market_type === 'score' && (

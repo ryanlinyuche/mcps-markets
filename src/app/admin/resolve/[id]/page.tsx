@@ -49,6 +49,46 @@ export default function ResolvePage() {
     }
   }
 
+  async function handleApprove() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/markets/${id}/approve-resolution`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolution_notes: notes }),
+      })
+      if (res.ok) {
+        toast.success('Resolution approved — coins distributed')
+        router.push('/admin/markets')
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Failed to approve')
+      }
+    } catch {
+      toast.error('Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleReject() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/markets/${id}/reject-resolution`, { method: 'POST' })
+      if (res.ok) {
+        toast.success('Resolution request rejected — market returned to open')
+        router.push('/admin/markets')
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Failed to reject')
+      }
+    } catch {
+      toast.error('Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!market) return <p className="text-muted-foreground">Loading...</p>
 
   const isScore = market.market_type === 'score' || market.market_type === 'personal_score'
@@ -78,6 +118,47 @@ export default function ResolvePage() {
           )}
         </div>
       </div>
+
+      {/* Creator resolution request */}
+      {market.status === 'pending_resolution' && market.pending_outcome && (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-yellow-900">Creator Resolution Request</p>
+            <p className="text-xs text-yellow-700 mt-0.5">
+              The market creator has proposed resolving this market as: <span className="font-bold">{market.pending_outcome}</span>
+            </p>
+          </div>
+          {market.resolution_proof && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-yellow-800 uppercase tracking-wide">Submitted Proof</p>
+              <a href={market.resolution_proof} target="_blank" rel="noopener noreferrer">
+                <img src={market.resolution_proof} alt="Resolution proof"
+                  className="rounded-md border border-yellow-200 max-h-64 w-full object-contain bg-white hover:opacity-90 transition-opacity cursor-pointer" />
+              </a>
+              <p className="text-xs text-yellow-700">Click to open full size</p>
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-yellow-900">Resolution Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Add a note visible to all users..."
+              className="w-full min-h-[60px] px-3 py-2 text-sm border border-yellow-200 rounded-md bg-white resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              maxLength={500}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button className="bg-green-600 hover:bg-green-700 flex-1" onClick={handleApprove} disabled={loading}>
+              Approve &amp; Distribute Coins
+            </Button>
+            <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 flex-1" onClick={handleReject} disabled={loading}>
+              Reject Request
+            </Button>
+          </div>
+          <p className="text-xs text-yellow-700">Approving will resolve the market and pay out winners. Rejecting returns it to open.</p>
+        </div>
+      )}
 
       {/* Resolution criteria */}
       {(market.resolution_criteria || market.resolution_source) && (
@@ -133,18 +214,20 @@ export default function ResolvePage() {
         </div>
       )}
 
-      {/* Resolution notes */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium">Resolution Notes (optional)</label>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="e.g. Class average was 78.4, confirmed via Canvas gradebook on 3/15"
-          className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-          maxLength={500}
-        />
-        <p className="text-xs text-muted-foreground">Explain your resolution decision. This will be visible to all users.</p>
-      </div>
+      {/* Resolution notes (for manual resolution only) */}
+      {market.status !== 'pending_resolution' && (
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Resolution Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="e.g. Class average was 78.4, confirmed via Canvas gradebook on 3/15"
+            className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            maxLength={500}
+          />
+          <p className="text-xs text-muted-foreground">Explain your resolution decision. This will be visible to all users.</p>
+        </div>
+      )}
 
       <p className="text-sm text-muted-foreground">
         Winners will receive a proportional payout from the total pool. This action cannot be undone.

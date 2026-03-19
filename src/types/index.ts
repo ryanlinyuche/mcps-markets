@@ -31,8 +31,10 @@ export interface Market {
   market_type: 'yesno' | 'score' | 'personal_score' | 'sports'
   creator_id: number
   creator_name?: string
-  status: 'pending_approval' | 'open' | 'rejected' | 'resolved'
+  status: 'pending_approval' | 'open' | 'rejected' | 'resolved' | 'pending_resolution'
   outcome: string | null
+  pending_outcome?: string | null
+  resolution_requested_by?: number | null
   yes_pool: number
   no_pool: number
   closes_at: string | null
