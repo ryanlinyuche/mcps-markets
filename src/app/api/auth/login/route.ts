@@ -5,209 +5,110 @@ import { db } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
-const DISTRICT_BASE = 'https://md-mcps-psv.edupoint.com'
-const LOGIN_URL = `${DISTRICT_BASE}/PXP2_Login_Student.aspx?regenerateSessionId=True`
+const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
+const PROXY_BASE = 'https://studentvuelibtest.up.railway.app'
 
-const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'sec-ch-ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"macOS"',
-}
+const escapeXml = (s: string) => s
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;')
 
-// Parse Set-Cookie header(s) into a name→value map
-function parseSetCookies(res: Response): Record<string, string> {
-  const out: Record<string, string> = {}
-  const raw = res.headers.get('set-cookie') ?? ''
-  if (!raw) return out
-  // Split on commas that precede a new cookie name (heuristic safe for ASP.NET cookies)
-  const parts = raw.split(/,(?=\s*[A-Za-z_][A-Za-z0-9_.%]*=)/)
-  for (const part of parts) {
-    const nameVal = part.split(';')[0].trim()
-    const eq = nameVal.indexOf('=')
-    if (eq > 0) out[nameVal.slice(0, eq).trim()] = nameVal.slice(eq + 1).trim()
-  }
-  return out
-}
-
-function cookieStr(cookies: Record<string, string>): string {
-  return Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ')
-}
-
-function extractHidden(html: string, name: string): string {
-  const m = html.match(new RegExp(`id="${name}"[^>]*value="([^"]*)"`, 'i'))
-    ?? html.match(new RegExp(`name="${name}"[^>]*value="([^"]*)"`, 'i'))
-    ?? html.match(new RegExp(`value="([^"]*)"[^>]*(?:id|name)="${name}"`, 'i'))
-  return m?.[1] ?? ''
-}
-
-function extractName(html: string): string | undefined {
-  // Various places the StudentVUE portal puts the student name
-  const patterns = [
-    /"StudentName"\s*:\s*"([^"]+)"/,
-    /"FormattedName"\s*:\s*"([^"]+)"/,
-    /id="[^"]*StudentName[^"]*"[^>]*>([^<]+)</i,
-    /class="[^"]*user-name[^"]*"[^>]*>\s*([^<\s][^<]+?)\s*</i,
-    /class="[^"]*student-name[^"]*"[^>]*>([^<]+)</i,
-    // Synergy nav often has "Welcome, FirstName LastName"
-    /Welcome[,\s]+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/,
-    // Title or heading tags with a full name
-    /<title>[^|<]*\|\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*</,
-  ]
-  for (const p of patterns) {
-    const m = html.match(p)
-    if (m?.[1]?.trim()) return m[1].trim()
-  }
-  return undefined
-}
-
-interface LoginResult {
-  valid: boolean
-  name?: string
-  cookies?: Record<string, string>
-}
-
-async function verifyStudentVue(studentId: string, password: string): Promise<LoginResult> {
-  // ── Step 1: GET login page for ASP.NET tokens + session cookie ──
-  const pageRes = await fetch(LOGIN_URL, { headers: BROWSER_HEADERS })
-  if (!pageRes.ok) throw new Error(`Login page fetch failed: ${pageRes.status}`)
-
-  const pageHtml = await pageRes.text()
-  let cookies = parseSetCookies(pageRes)
-
-  const viewState = extractHidden(pageHtml, '__VIEWSTATE')
-  const eventValidation = extractHidden(pageHtml, '__EVENTVALIDATION')
-  const viewStateGenerator = extractHidden(pageHtml, '__VIEWSTATEGENERATOR')
-
-  console.log('[login] got login page, cookies:', Object.keys(cookies), '| viewstate:', !!viewState)
-
-  // ── Step 2: POST credentials ──
-  const body = new URLSearchParams({
-    '__VIEWSTATE': viewState,
-    '__EVENTVALIDATION': eventValidation,
-    '__VIEWSTATEGENERATOR': viewStateGenerator,
-    'ctl00$MainContent$Submit1': 'Login',
-    'ctl00$MainContent$username': studentId,
-    'ctl00$MainContent$password': password,
-  })
-
-  const loginRes = await fetch(LOGIN_URL, {
+// Encrypt password via proxy (required by MCPS after their server upgrade)
+async function encryptPassword(password: string): Promise<string> {
+  const res = await fetch(`${PROXY_BASE}/encryptPassword`, {
     method: 'POST',
-    headers: {
-      ...BROWSER_HEADERS,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Cookie': cookieStr(cookies),
-      'Referer': LOGIN_URL,
-      'Origin': DISTRICT_BASE,
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'same-origin',
-      'Sec-Fetch-User': '?1',
-      'Sec-Fetch-Dest': 'document',
-    },
-    body: body.toString(),
-    redirect: 'manual',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!res.ok) throw new Error(`encryptPassword failed: ${res.status}`)
+  const data = await res.json() as { encryptedPassword?: string }
+  if (!data.encryptedPassword) throw new Error('No encryptedPassword in response')
+  return data.encryptedPassword
+}
+
+function buildSoapXml(studentId: string, encryptedPassword: string, methodName: string, paramStr: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(encryptedPassword)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
+}
+
+// Send SOAP through proxy with encrypted password
+async function callDistrict(studentId: string, encryptedPassword: string, methodName: string, paramStr: string): Promise<string> {
+  const xml = buildSoapXml(studentId, encryptedPassword, methodName, paramStr)
+
+  const res = await fetch(`${PROXY_BASE}/fulfillAxios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: DISTRICT_URL, xml, encrypted: true }),
   })
 
-  cookies = { ...cookies, ...parseSetCookies(loginRes) }
-  const location = loginRes.headers.get('location') ?? ''
-  console.log('[login] POST status:', loginRes.status, '| location:', location)
+  const data = await res.json() as { status: boolean; response?: string; message?: string }
+  console.log('[district] proxy status:', data.status, '| sample:', String(data.response ?? data.message ?? '').slice(0, 300))
 
-  // Failed login → stays on login page (200) or redirects back to it
-  if (loginRes.status !== 302 || location.toLowerCase().includes('login')) {
+  if (!data.status || !data.response) throw new Error(`Proxy error: ${data.message ?? 'no response'}`)
+
+  const result = data.response.match(/<ProcessWebServiceRequestMultiWebResult>([\s\S]*?)<\/ProcessWebServiceRequestMultiWebResult>/)?.[1]
+  if (!result) throw new Error('Invalid SOAP response')
+  return result
+}
+
+async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string; encryptedPassword?: string }> {
+  const encryptedPassword = await encryptPassword(password)
+  const text = await callDistrict(studentId, encryptedPassword, 'StudentInfo', '<Parms></Parms>')
+
+  console.log('[login] district response sample:', text.slice(0, 300))
+
+  if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) {
     return { valid: false }
   }
 
-  // ── Step 3: Follow redirect to extract student name ──
-  const dashUrl = location.startsWith('http')
-    ? location
-    : `${DISTRICT_BASE}${location.startsWith('/') ? '' : '/'}${location}`
+  const decoded = text
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&').replace(/&apos;/g, "'")
 
-  const dashRes = await fetch(dashUrl, {
-    headers: {
-      ...BROWSER_HEADERS,
-      'Cookie': cookieStr(cookies),
-      'Referer': LOGIN_URL,
-    },
-    redirect: 'follow',
-  })
+  const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim()
+    ?? decoded.match(/<NickName>([^<]+)<\/NickName>/)?.[1]?.trim()
 
-  cookies = { ...cookies, ...parseSetCookies(dashRes) }
-  const dashHtml = await dashRes.text()
-  const name = extractName(dashHtml)
-  console.log('[login] extracted name:', name, '| dashboard url:', dashUrl)
-
-  return { valid: true, name, cookies }
+  console.log('[login] parsed name:', name)
+  return { valid: true, name, encryptedPassword }
 }
 
-// ── Schedule via PXP2 JSON API ──────────────────────────────────────
+interface ClassPeriodRaw { period: string; course_title: string; teacher: string; room: string; course_code: string }
 
-interface ClassInfo { period: string; course_title: string; teacher: string; room: string; course_code: string }
+function decodeXml(s: string) {
+  return s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
+}
 
-async function fetchAndStoreSchedule(
-  cookies: Record<string, string>,
-  userId: number
-): Promise<void> {
+function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
+  const periods: ClassPeriodRaw[] = []
+  const pattern = /<\w+\b([^>]*?\bPeriod="[^"]*"[^>]*?)(?:\/>|>)/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(decoded)) !== null) {
+    const attrs = match[1]
+    const get = (name: string) => new RegExp(`\\b${name}="([^"]*?)"`).exec(attrs)?.[1]?.trim() ?? ''
+    const period = get('Period')
+    const course = get('CourseTitle') || get('CourseName') || get('Course')
+    if (period && course && !periods.some(p => p.period === period)) {
+      periods.push({
+        period,
+        course_title: course,
+        teacher: get('Teacher') || get('StaffName'),
+        room: get('RoomName') || get('Room') || get('RoomNum'),
+        course_code: get('CourseCode') || get('SectionCode') || get('CourseNum'),
+      })
+    }
+  }
+  return periods
+}
+
+async function fetchAndStoreSchedule(studentId: string, encryptedPassword: string, userId: number): Promise<void> {
   try {
-    const cookieHeader = cookieStr(cookies)
-
-    // Get gradebook page to extract school params
-    const gbRes = await fetch(`${DISTRICT_BASE}/PXP2_GradeBook.aspx?AGU=0`, {
-      headers: { ...BROWSER_HEADERS, 'Cookie': cookieHeader, 'Referer': `${DISTRICT_BASE}/PXP2_LaunchPad.aspx` },
-    })
-    const gbHtml = await gbRes.text()
-
-    // School/period data is embedded as JSON on line 17 of the HTML (grademelon technique)
-    const lines = gbHtml.split('\n')
-    let schoolData: { Schools?: Array<{ SchoolID: number; GradingPeriods: Array<{ GU: string; MarkPeriods: Array<{ GU: string }> }> }> } | null = null
-    for (const line of lines.slice(10, 30)) {
-      const idx = line.indexOf('{')
-      if (idx >= 0 && line.includes('Schools')) {
-        try { schoolData = JSON.parse(line.slice(idx, line.lastIndexOf('}') + 1)) } catch { /* skip */ }
-        if (schoolData) break
-      }
-    }
-
-    if (!schoolData?.Schools?.[0]) {
-      console.log('[schedule] could not parse school data')
-      return
-    }
-
-    const school = schoolData.Schools[0]
-    const period = school.GradingPeriods[0]
-
-    // Fetch class list for the current grading period
-    const classRes = await fetch(`${DISTRICT_BASE}/service/PXP2Communication.asmx/GradebookFocusClassInfo`, {
-      method: 'POST',
-      headers: {
-        ...BROWSER_HEADERS,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Cookie': cookieHeader,
-        'Origin': DISTRICT_BASE,
-        'Referer': `${DISTRICT_BASE}/PXP2_GradeBook.aspx?AGU=0`,
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-      },
-      body: JSON.stringify({ request: { gradingPeriodGU: period.GU, AGU: '0', schoolID: school.SchoolID } }),
-    })
-
-    const classJson = await classRes.json() as { d?: { Data?: { Classes?: Array<{ ID: string; Name: string; TeacherName: string }> } } }
-    const classes = classJson?.d?.Data?.Classes ?? []
-    console.log(`[schedule] found ${classes.length} classes for user ${userId}`)
-
-    if (classes.length === 0) return
-
-    // Map to our schema — period/room not available from this API
-    const periods: ClassInfo[] = classes.map((c, i) => ({
-      period: String(i + 1),
-      course_title: c.Name,
-      teacher: c.TeacherName ?? '',
-      room: '',
-      course_code: c.ID ?? '',
-    }))
-
+    const result = await callDistrict(studentId, encryptedPassword, 'StudentClassList', '<Parms></Parms>')
+    const decoded = decodeXml(result)
+    console.log('[schedule] raw xml sample:', decoded.slice(0, 500))
+    const periods = parsePeriodsFromXml(decoded)
+    console.log(`[schedule] found ${periods.length} periods for user ${userId}`)
+    if (periods.length === 0) return
     await db.execute({ sql: 'DELETE FROM user_schedule WHERE user_id = ?', args: [userId] })
     for (const p of periods) {
       await db.execute({
@@ -220,8 +121,6 @@ async function fetchAndStoreSchedule(
     console.error('[schedule] fetch failed for user', userId, err)
   }
 }
-
-// ── Main handler ─────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
@@ -236,7 +135,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Student ID must be a 6 or 7 digit number' }, { status: 400 })
     }
 
-    let svResult: LoginResult
+    let svResult: { valid: boolean; name?: string; encryptedPassword?: string }
     try {
       svResult = await verifyStudentVue(studentId, password)
     } catch (err) {
@@ -274,9 +173,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Fire-and-forget schedule fetch using the live session cookies
-    if (svResult.cookies) {
-      fetchAndStoreSchedule(svResult.cookies, Number(user.id)).catch(() => {})
+    // Fire-and-forget schedule fetch
+    if (svResult.encryptedPassword) {
+      fetchAndStoreSchedule(studentId, svResult.encryptedPassword, Number(user.id)).catch(() => {})
     }
 
     const token = await signToken({
