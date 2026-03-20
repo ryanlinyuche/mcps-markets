@@ -28,8 +28,9 @@ async function callDistrict(studentId: string, password: string, methodName: str
     },
     body: xml,
   })
-  if (!res.ok) throw new Error(`District returned ${res.status}`)
   const text = await res.text()
+  console.log('[district] status:', res.status, '| body sample:', text.slice(0, 400))
+  if (!res.ok) throw new Error(`District returned ${res.status}`)
   const result = text.match(/<ProcessWebServiceRequestMultiWebResult>([\s\S]*?)<\/ProcessWebServiceRequestMultiWebResult>/)?.[1]
   if (!result) throw new Error('Invalid SOAP response')
   return result
@@ -37,10 +38,12 @@ async function callDistrict(studentId: string, password: string, methodName: str
 
 async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
   const text = await callDistrict(studentId, password, 'StudentInfo', '<Parms></Parms>')
+  console.log('[login] district response sample:', text.slice(0, 500))
   if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) return { valid: false }
   const decoded = text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
   const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim() ||
                decoded.match(/<NickName>([^<]+)<\/NickName>/)?.[1]?.trim()
+  console.log('[login] parsed name:', name, '| valid:', true)
   return { valid: true, name }
 }
 
