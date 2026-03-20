@@ -11,7 +11,7 @@ async function fetchMarkets() {
           FROM markets m
           JOIN users u ON m.creator_id = u.id
           LEFT JOIN users su ON m.subject_user_id = su.id
-          WHERE m.status = 'open' AND (m.closes_at IS NULL OR m.closes_at > datetime('now'))
+          WHERE m.status = 'open' AND (m.closes_at IS NULL OR datetime(m.closes_at) > datetime('now'))
           ORDER BY m.created_at DESC`,
     args: [],
   })

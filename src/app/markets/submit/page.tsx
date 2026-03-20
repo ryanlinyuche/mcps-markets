@@ -76,7 +76,7 @@ export default function SubmitMarketPage() {
       const body: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
-        closes_at: closesAt || null,
+        closes_at: closesAt ? new Date(closesAt).toISOString().replace('T', ' ').slice(0, 19) : null,
         school,
         market_type: marketType,
         resolution_criteria: resolutionCriteria.trim(),

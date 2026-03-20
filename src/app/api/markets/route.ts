@@ -28,9 +28,9 @@ export async function GET(request: NextRequest) {
     sql = base + `WHERE m.creator_id = ? AND m.status NOT IN ('rejected') ORDER BY m.created_at DESC`
     args.push(Number(userId))
   } else if (tab === 'ongoing') {
-    sql = base + `WHERE m.status = 'open' AND (m.closes_at IS NULL OR m.closes_at > datetime('now')) ORDER BY m.created_at DESC`
+    sql = base + `WHERE m.status = 'open' AND (m.closes_at IS NULL OR datetime(m.closes_at) > datetime('now')) ORDER BY m.created_at DESC`
   } else if (tab === 'closed') {
-    sql = base + `WHERE (m.status = 'open' AND m.closes_at IS NOT NULL AND m.closes_at <= datetime('now')) OR m.status = 'pending_resolution' ORDER BY m.closes_at DESC`
+    sql = base + `WHERE (m.status = 'open' AND m.closes_at IS NOT NULL AND datetime(m.closes_at) <= datetime('now')) OR m.status = 'pending_resolution' ORDER BY m.closes_at DESC`
   } else if (tab === 'resolved') {
     if (betOnly && userId) {
       sql = base + `JOIN positions p ON p.market_id = m.id WHERE m.status = 'resolved' AND p.user_id = ? ORDER BY m.resolved_at DESC`

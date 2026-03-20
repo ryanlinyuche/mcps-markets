@@ -120,7 +120,7 @@ export async function resolveMarket(marketId: number, outcome: 'YES' | 'NO', res
     const marketRes = await txn.execute({ sql: 'SELECT status, yes_pool, no_pool FROM markets WHERE id = ?', args: [marketId] })
     const market = marketRes.rows[0] as unknown as { status: string; yes_pool: number; no_pool: number } | undefined
     if (!market) throw new Error('Market not found')
-    if (market.status !== 'open') throw new Error('Market is not open')
+    if (market.status !== 'open' && market.status !== 'pending_resolution') throw new Error('Market is not open')
 
     const winPool = outcome === 'YES' ? market.yes_pool : market.no_pool
     const totalPool = market.yes_pool + market.no_pool
@@ -163,7 +163,7 @@ export async function resolveMarketNA(marketId: number, resolvedBy: number, note
     const marketRes = await txn.execute({ sql: 'SELECT status FROM markets WHERE id = ?', args: [marketId] })
     const market = marketRes.rows[0] as unknown as { status: string } | undefined
     if (!market) throw new Error('Market not found')
-    if (market.status !== 'open') throw new Error('Market is not open')
+    if (market.status !== 'open' && market.status !== 'pending_resolution') throw new Error('Market is not open')
 
     const allRes = await txn.execute({ sql: 'SELECT user_id, coins_bet FROM positions WHERE market_id = ?', args: [marketId] })
     for (const pos of allRes.rows as unknown as { user_id: number; coins_bet: number }[]) {
@@ -191,7 +191,7 @@ export async function resolveScoreMarket(marketId: number, winningLabel: string,
     const marketRes = await txn.execute({ sql: 'SELECT status, market_type FROM markets WHERE id = ?', args: [marketId] })
     const market = marketRes.rows[0] as unknown as { status: string; market_type: string } | undefined
     if (!market) throw new Error('Market not found')
-    if (market.status !== 'open') throw new Error('Market is not open')
+    if (market.status !== 'open' && market.status !== 'pending_resolution') throw new Error('Market is not open')
     if (market.market_type !== 'score' && market.market_type !== 'personal_score') throw new Error('Not a score market')
 
     const poolsRes = await txn.execute({ sql: 'SELECT label, amount FROM option_pools WHERE market_id = ?', args: [marketId] })

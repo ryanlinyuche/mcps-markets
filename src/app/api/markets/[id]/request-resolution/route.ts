@@ -45,7 +45,7 @@ export async function POST(
   })
 
   await db.execute({
-    sql: `UPDATE markets SET status = 'pending_resolution', pending_outcome = ?, resolution_proof = ?, resolution_requested_by = ? WHERE id = ?`,
+    sql: `UPDATE markets SET status = 'pending_resolution', pending_outcome = ?, resolution_proof = ?, resolution_requested_by = ?, closes_at = COALESCE(closes_at, datetime('now')) WHERE id = ?`,
     args: [outcome, blob.url, userId, marketId],
   })
 
