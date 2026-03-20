@@ -86,6 +86,16 @@ export async function register() {
         updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
         PRIMARY KEY (user_id, period)
       )`,
+      `CREATE TABLE IF NOT EXISTS monthly_winners (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        year        INTEGER NOT NULL,
+        month       INTEGER NOT NULL,
+        user_id     INTEGER REFERENCES users(id),
+        user_name   TEXT NOT NULL,
+        coins       INTEGER NOT NULL,
+        recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(year, month)
+      )`,
       `CREATE INDEX IF NOT EXISTS idx_markets_status ON markets(status)`,
       `CREATE INDEX IF NOT EXISTS idx_positions_user ON positions(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_positions_market ON positions(market_id)`,
@@ -101,6 +111,7 @@ export async function register() {
     const alterStatements = [
       `ALTER TABLE markets ADD COLUMN pending_outcome TEXT`,
       `ALTER TABLE markets ADD COLUMN resolution_requested_by INTEGER REFERENCES users(id)`,
+      `ALTER TABLE users ADD COLUMN last_active_at TEXT`,
     ]
     for (const sql of alterStatements) {
       try { await db.execute(sql) } catch { /* column already exists */ }

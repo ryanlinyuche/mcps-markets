@@ -25,6 +25,9 @@ export async function Navbar() {
 
         {session ? (
           <div className="flex items-center gap-4">
+            <Link href="/winners" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
+              Winners
+            </Link>
             <Link href="/markets/ongoing" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Markets
             </Link>
@@ -36,6 +39,9 @@ export async function Navbar() {
             </Link>
             <Link href="/leaderboard" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Leaderboard
+            </Link>
+            <Link href="/rules" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
+              Rules
             </Link>
             <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground hidden sm:block">
               Profile
