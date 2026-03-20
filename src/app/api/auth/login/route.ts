@@ -15,7 +15,7 @@ const escapeXml = (s: string) => s
   .replace(/'/g, '&apos;')
 
 function buildSoapXml(studentId: string, password: string, methodName: string, paramStr: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
+  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr><userAgent>StudentVUE/9.1.0 CFNetwork/1474 Darwin/23.0.0</userAgent></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
 }
 
 async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
@@ -25,6 +25,7 @@ async function callDistrict(studentId: string, password: string, methodName: str
     headers: {
       'Content-Type': 'text/xml; charset=utf-8',
       'SOAPAction': '"http://edupoint.com/webservices/ProcessWebServiceRequestMultiWeb"',
+      'User-Agent': 'StudentVUE/9.1.0 CFNetwork/1474 Darwin/23.0.0',
     },
     body: xml,
   })
