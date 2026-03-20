@@ -7,6 +7,8 @@ import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { toast } from 'sonner'
 
+const OWNER_STUDENT_ID = '195202'
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,17 +61,23 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{user.student_id}</td>
                 <td className="px-4 py-3 text-right"><CoinDisplay amount={user.balance} size="sm" /></td>
                 <td className="px-4 py-3 text-center">
-                  <button
-                    onClick={() => toggleAdmin(user)}
-                    disabled={toggling === user.id}
-                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors disabled:opacity-50 ${
-                      user.is_admin
-                        ? 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200'
-                        : 'border-border text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {toggling === user.id ? '...' : user.is_admin ? 'Admin' : 'Make Admin'}
-                  </button>
+                  {user.student_id === OWNER_STUDENT_ID ? (
+                    <span className="text-xs px-2.5 py-1 rounded-full border font-medium bg-purple-100 text-purple-700 border-purple-300">
+                      Owner
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => toggleAdmin(user)}
+                      disabled={toggling === user.id}
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors disabled:opacity-50 ${
+                        user.is_admin
+                          ? 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200'
+                          : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {toggling === user.id ? '...' : user.is_admin ? 'Admin' : 'Make Admin'}
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">
                   {new Date(user.created_at).toLocaleDateString()}
