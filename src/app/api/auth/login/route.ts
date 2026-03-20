@@ -15,7 +15,7 @@ const escapeXml = (s: string) => s
   .replace(/'/g, '&apos;')
 
 function buildSoapXml(studentId: string, password: string, methodName: string, paramStr: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr><userAgent>StudentVUE/9.1.0 CFNetwork/1474 Darwin/23.0.0</userAgent></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
+  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
 }
 
 async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
@@ -25,7 +25,7 @@ async function callDistrict(studentId: string, password: string, methodName: str
     headers: {
       'Content-Type': 'text/xml; charset=utf-8',
       'SOAPAction': '"http://edupoint.com/webservices/ProcessWebServiceRequestMultiWeb"',
-      'User-Agent': 'StudentVUE/9.1.0 CFNetwork/1474 Darwin/23.0.0',
+      'User-Agent': 'Mozilla/5.0',
     },
     body: xml,
   })
@@ -40,6 +40,7 @@ async function callDistrict(studentId: string, password: string, methodName: str
 async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
   const text = await callDistrict(studentId, password, 'StudentInfo', '<Parms></Parms>')
   console.log('[login] district response sample:', text.slice(0, 500))
+  if (text.includes('UPD5304') || text.includes('update app')) throw new Error('DISTRICT_UPGRADE')
   if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) return { valid: false }
   const decoded = text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
   const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim() ||
@@ -116,6 +117,9 @@ export async function POST(request: NextRequest) {
       svResult = await verifyStudentVue(studentId, password)
     } catch (err) {
       console.error('StudentVUE request failed:', err)
+      if (err instanceof Error && err.message === 'DISTRICT_UPGRADE') {
+        return NextResponse.json({ error: 'The StudentVUE server is temporarily unavailable due to a recent upgrade. Please try again later.' }, { status: 503 })
+      }
       return NextResponse.json({ error: 'Could not reach StudentVUE. Try again.' }, { status: 503 })
     }
 
