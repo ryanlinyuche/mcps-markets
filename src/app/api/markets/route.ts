@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     title, description, closes_at, school, market_type,
     resolution_criteria, resolution_source,
     period_class, sport, team_a, team_b,
+    score_subtype, score_threshold,
   } = await request.json()
 
   if (!title || title.trim().length < 5) {
@@ -94,13 +95,15 @@ export async function POST(request: NextRequest) {
   const creatorId = Number(session.sub)
   const isPersonalScore = market_type === 'personal_score'
   const isSports = market_type === 'sports'
-  const type: 'yesno' | 'score' | 'personal_score' | 'sports' =
+  const isSatAct = market_type === 'sat_act'
+  const type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act' =
     isPersonalScore ? 'personal_score'
     : market_type === 'score' ? 'score'
     : isSports ? 'sports'
+    : isSatAct ? 'sat_act'
     : 'yesno'
 
-  const subjectUserId = isPersonalScore ? creatorId : null
+  const subjectUserId = (isPersonalScore || isSatAct) ? creatorId : null
 
   if ((type === 'score' || type === 'personal_score') && period_class) {
     const enrolledRes = await db.execute({
@@ -117,8 +120,8 @@ export async function POST(request: NextRequest) {
   const insertRes = await db.execute({
     sql: `INSERT INTO markets (title, description, school, market_type, creator_id, subject_user_id,
                                closes_at, resolution_criteria, resolution_source,
-                               period_class, sport, team_a, team_b)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                               period_class, sport, team_a, team_b, score_subtype, score_threshold)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       title.trim(),
       description?.trim() || null,
@@ -130,15 +133,17 @@ export async function POST(request: NextRequest) {
       resolution_criteria?.trim() || null,
       resolution_source?.trim() || null,
       (type === 'score' || type === 'personal_score') ? (period_class || null) : null,
-      isSports ? (sport || null) : null,
+      (isSports || isSatAct) ? (sport || null) : null,
       isSports ? (team_a?.trim() || null) : null,
       isSports ? (team_b?.trim() || null) : null,
+      score_subtype || null,
+      score_threshold ? Number(score_threshold) : null,
     ],
   })
 
   const marketId = Number(insertRes.lastInsertRowid)
 
-  if (type === 'score' || type === 'personal_score') {
+  if ((type === 'score' || type === 'personal_score') && score_subtype !== 'overunder') {
     for (const opt of SCORE_OPTIONS) {
       await db.execute({
         sql: 'INSERT INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',

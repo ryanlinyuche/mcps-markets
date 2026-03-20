@@ -13,6 +13,7 @@ export interface User {
   balance: number
   is_admin: number
   created_at: string
+  rules_accepted_at?: string | null
 }
 
 export interface OptionPool {
@@ -28,7 +29,7 @@ export interface Market {
   title: string
   description: string | null
   school: string
-  market_type: 'yesno' | 'score' | 'personal_score' | 'sports'
+  market_type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act'
   creator_id: number
   creator_name?: string
   status: 'pending_approval' | 'open' | 'rejected' | 'resolved' | 'pending_resolution'
@@ -57,6 +58,8 @@ export interface Market {
   sport?: string | null
   team_a?: string | null
   team_b?: string | null
+  score_subtype?: 'letter_grade' | 'overunder' | null
+  score_threshold?: number | null
 }
 
 export interface Position {

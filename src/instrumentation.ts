@@ -112,6 +112,9 @@ export async function register() {
       `ALTER TABLE markets ADD COLUMN pending_outcome TEXT`,
       `ALTER TABLE markets ADD COLUMN resolution_requested_by INTEGER REFERENCES users(id)`,
       `ALTER TABLE users ADD COLUMN last_active_at TEXT`,
+      `ALTER TABLE users ADD COLUMN rules_accepted_at TEXT`,
+      `ALTER TABLE markets ADD COLUMN score_subtype TEXT`,
+      `ALTER TABLE markets ADD COLUMN score_threshold INTEGER`,
     ]
     for (const sql of alterStatements) {
       try { await db.execute(sql) } catch { /* column already exists */ }

@@ -22,7 +22,9 @@ const SPORTS_LIST = [
   'Wrestling', 'Cross Country', 'Other',
 ]
 
-type MarketType = 'yesno' | 'score' | 'personal_score' | 'sports'
+type MarketType = 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act'
+type ScoreSubtype = 'letter_grade' | 'overunder'
+type SatActType = 'SAT' | 'ACT'
 
 export default function SubmitMarketPage() {
   const router = useRouter()
@@ -45,6 +47,13 @@ export default function SubmitMarketPage() {
   const [teamA, setTeamA] = useState('')
   const [teamB, setTeamB] = useState('')
   const [sportsSubtype, setSportsSubtype] = useState<'matchup' | 'overunder' | 'other'>('matchup')
+
+  // Score subtype fields
+  const [scoreSubtype, setScoreSubtype] = useState<ScoreSubtype>('letter_grade')
+  const [scoreThreshold, setScoreThreshold] = useState('')
+
+  // SAT/ACT fields
+  const [satActType, setSatActType] = useState<SatActType>('SAT')
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -70,6 +79,12 @@ export default function SubmitMarketPage() {
     if (!resolutionCriteria.trim()) { toast.error('Resolution criteria is required'); return }
     if (!resolutionSource.trim()) { toast.error('Resolution source is required'); return }
     if (marketType === 'sports' && !sport) { toast.error('Select a sport'); return }
+    if ((isScoreType && scoreSubtype === 'overunder') && !scoreThreshold) {
+      toast.error('Enter a score threshold for over/under'); return
+    }
+    if (marketType === 'sat_act' && !scoreThreshold) {
+      toast.error('Enter a score threshold for over/under'); return
+    }
 
     setLoading(true)
     try {
@@ -82,9 +97,13 @@ export default function SubmitMarketPage() {
         resolution_criteria: resolutionCriteria.trim(),
         resolution_source: resolutionSource.trim(),
         period_class: isScoreType && periodClass ? periodClass : null,
-        sport: marketType === 'sports' ? sport : null,
+        sport: marketType === 'sports' ? sport : marketType === 'sat_act' ? satActType : null,
         team_a: marketType === 'sports' && sportsSubtype === 'matchup' ? teamA.trim() || null : null,
         team_b: marketType === 'sports' && sportsSubtype === 'matchup' ? teamB.trim() || null : null,
+        score_subtype: isScoreType ? scoreSubtype : marketType === 'sat_act' ? 'overunder' : null,
+        score_threshold: (isScoreType && scoreSubtype === 'overunder') || marketType === 'sat_act'
+          ? Number(scoreThreshold)
+          : null,
       }
 
       const res = await fetch('/api/markets', {
@@ -124,6 +143,7 @@ export default function SubmitMarketPage() {
                   { type: 'score', label: 'Class Score', desc: 'Bet on class average grade', color: 'primary' },
                   { type: 'personal_score', label: 'My Score', desc: 'Let others bet on YOUR grade', color: 'purple' },
                   { type: 'sports', label: '🏆 Sports', desc: 'Who wins, over/under, etc.', color: 'orange' },
+                  { type: 'sat_act', label: '📝 SAT / ACT', desc: 'Standardized test score bet', color: 'blue' },
                 ] as { type: MarketType; label: string; desc: string; color: string }[]).map(({ type, label, desc, color }) => (
                   <button
                     key={type}
@@ -135,6 +155,8 @@ export default function SubmitMarketPage() {
                           ? 'border-purple-600 bg-purple-50 text-purple-700'
                           : color === 'orange'
                           ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : color === 'blue'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
                           : 'border-primary bg-primary/10 text-primary'
                         : 'hover:bg-muted'
                     }`}
@@ -154,7 +176,98 @@ export default function SubmitMarketPage() {
                   🏆 Create a sports betting market — who wins a game, over/under points, etc.
                 </p>
               )}
+              {marketType === 'sat_act' && (
+                <p className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1.5">
+                  📝 Bet on whether your SAT or ACT score will be OVER or UNDER a target number.
+                </p>
+              )}
             </div>
+
+            {/* Score subtype selector (letter grade vs over/under) */}
+            {isScoreType && (
+              <div className="space-y-2 rounded-md border border-muted p-3">
+                <Label className="text-sm font-medium">Bet Style</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScoreSubtype('letter_grade')}
+                    className={`rounded-md border px-3 py-2.5 text-sm font-medium text-left transition-colors ${
+                      scoreSubtype === 'letter_grade' ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted'
+                    }`}
+                  >
+                    <div className="font-semibold">Letter Grade</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">A / B / C / D / F</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoreSubtype('overunder')}
+                    className={`rounded-md border px-3 py-2.5 text-sm font-medium text-left transition-colors ${
+                      scoreSubtype === 'overunder' ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted'
+                    }`}
+                  >
+                    <div className="font-semibold">Over / Under</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Above or below a score</div>
+                  </button>
+                </div>
+                {scoreSubtype === 'overunder' && (
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs">Score Threshold (0–100)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={scoreThreshold}
+                      onChange={e => setScoreThreshold(e.target.value)}
+                      placeholder="e.g. 85"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Bettors pick: <strong>Over {scoreThreshold || '?'}</strong> (YES) or <strong>Under {scoreThreshold || '?'}</strong> (NO)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SAT/ACT sub-fields */}
+            {marketType === 'sat_act' && (
+              <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/30 p-3">
+                <div className="space-y-1">
+                  <Label>Test Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['SAT', 'ACT'] as SatActType[]).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setSatActType(t)}
+                        className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
+                          satActType === t ? 'border-blue-500 bg-blue-100 text-blue-800' : 'hover:bg-muted bg-background'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Score Threshold ({satActType === 'SAT' ? '400–1600' : '1–36'})
+                  </Label>
+                  <Input
+                    type="number"
+                    min={satActType === 'SAT' ? 400 : 1}
+                    max={satActType === 'SAT' ? 1600 : 36}
+                    value={scoreThreshold}
+                    onChange={e => setScoreThreshold(e.target.value)}
+                    placeholder={satActType === 'SAT' ? 'e.g. 1200' : 'e.g. 28'}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Bettors pick: <strong>Over {scoreThreshold || '?'}</strong> (YES) or <strong>Under {scoreThreshold || '?'}</strong> (NO)
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Sports sub-fields */}
             {marketType === 'sports' && (
@@ -221,7 +334,7 @@ export default function SubmitMarketPage() {
             )}
 
             {/* School */}
-            {marketType !== 'sports' && (
+            {marketType !== 'sports' && marketType !== 'sat_act' && (
               <div className="space-y-1">
                 <Label htmlFor="school">School</Label>
                 <select
@@ -269,6 +382,7 @@ export default function SubmitMarketPage() {
                 {marketType === 'personal_score' ? 'Test / Quiz Name *'
                   : marketType === 'score' ? 'Class & Test Name *'
                   : marketType === 'sports' ? 'Event Title *'
+                  : marketType === 'sat_act' ? 'Title *'
                   : 'Question *'}
               </Label>
               <Input
@@ -279,6 +393,7 @@ export default function SubmitMarketPage() {
                   marketType === 'personal_score' ? 'e.g. AP Calc BC — Unit 5 Test'
                     : marketType === 'score' ? 'e.g. AP Calc BC — Unit 5 Test'
                     : marketType === 'sports' ? 'e.g. Churchill vs BCC — Varsity Basketball'
+                    : marketType === 'sat_act' ? `e.g. My ${satActType} Score — March 2026`
                     : 'e.g. Will MCPS cancel school on Dec 20?'
                 }
                 required
@@ -287,8 +402,18 @@ export default function SubmitMarketPage() {
               {marketType === 'sports' && sportsSubtype === 'matchup' && teamA && teamB && (
                 <p className="text-xs text-muted-foreground">YES = {teamA} wins · NO = {teamB} wins</p>
               )}
-              {marketType === 'score' && <p className="text-xs text-muted-foreground">Students bet on which grade range (A/B/C/D/F) the class average falls in</p>}
-              {marketType === 'personal_score' && <p className="text-xs text-muted-foreground">Others bet on which grade range (A/B/C/D/F) <strong>{userName ?? 'you'}</strong> score in</p>}
+              {marketType === 'score' && scoreSubtype === 'letter_grade' && (
+                <p className="text-xs text-muted-foreground">Students bet on which grade range (A/B/C/D/F) the class average falls in</p>
+              )}
+              {marketType === 'score' && scoreSubtype === 'overunder' && (
+                <p className="text-xs text-muted-foreground">Students bet over/under {scoreThreshold || '?'} on the class average</p>
+              )}
+              {marketType === 'personal_score' && scoreSubtype === 'letter_grade' && (
+                <p className="text-xs text-muted-foreground">Others bet on which grade range (A/B/C/D/F) <strong>{userName ?? 'you'}</strong> score in</p>
+              )}
+              {marketType === 'personal_score' && scoreSubtype === 'overunder' && (
+                <p className="text-xs text-muted-foreground">Others bet over/under {scoreThreshold || '?'} on <strong>{userName ?? 'your'}</strong> score</p>
+              )}
             </div>
 
             {/* Description */}
@@ -302,6 +427,7 @@ export default function SubmitMarketPage() {
                   marketType === 'sports' ? 'Add context: date, time, location, league...'
                     : marketType === 'personal_score' ? 'Add context: which class, teacher, when scores come out...'
                     : marketType === 'score' ? 'Add context: which class, teacher, when scores are released...'
+                    : marketType === 'sat_act' ? 'Add context: test date, location, etc.'
                     : 'Add any additional context...'
                 }
                 className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
@@ -320,6 +446,7 @@ export default function SubmitMarketPage() {
                   marketType === 'sports' ? 'e.g. Resolved based on the final score posted on MaxPreps.'
                     : marketType === 'personal_score' ? `e.g. Resolved based on ${userName ?? 'my'} grade visible on Canvas once posted.`
                     : marketType === 'score' ? 'e.g. Resolved based on class average visible on Canvas once posted.'
+                    : marketType === 'sat_act' ? `e.g. Resolved based on official ${satActType} score report.`
                     : 'e.g. Resolved YES if MCPS officially announces a cancellation.'
                 }
                 className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
@@ -338,6 +465,7 @@ export default function SubmitMarketPage() {
                 onChange={e => setResolutionSource(e.target.value)}
                 placeholder={
                   marketType === 'sports' ? 'e.g. MaxPreps, ESPN, MCPS Athletics website'
+                    : marketType === 'sat_act' ? 'e.g. College Board score report, ACT score report'
                     : 'e.g. Canvas gradebook, Google Classroom, MCPS website'
                 }
                 required
@@ -357,6 +485,9 @@ export default function SubmitMarketPage() {
               />
               {marketType === 'sports' && (
                 <p className="text-xs text-muted-foreground">Typically set to game start time so no one bets after the game begins.</p>
+              )}
+              {marketType === 'sat_act' && (
+                <p className="text-xs text-muted-foreground">Typically set to test day morning.</p>
               )}
             </div>
 
