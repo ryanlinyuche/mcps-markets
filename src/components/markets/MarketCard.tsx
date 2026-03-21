@@ -14,8 +14,8 @@ function MultiOptionDisplay({ options }: { options: OptionPool[] }) {
               <span className="text-muted-foreground truncate pr-2">{opt.label}</span>
               <span className="font-semibold text-foreground">{pct}%</span>
             </div>
-            <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full bg-sky-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-1 rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-primary dark:bg-sky-500 transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
         )
@@ -32,11 +32,11 @@ interface MarketCardProps {
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  open:               { label: 'Open',       className: 'bg-sky-500/15 text-sky-400 border border-sky-500/30' },
-  pending_approval:   { label: 'Pending',    className: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' },
-  pending_resolution: { label: 'Resolving',  className: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
-  resolved:           { label: 'Resolved',   className: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
-  rejected:           { label: 'Rejected',   className: 'bg-red-500/15 text-red-400 border border-red-500/30' },
+  open:               { label: 'Open',       className: 'bg-green-100 text-green-700 border border-green-200 dark:bg-sky-500/15 dark:text-sky-400 dark:border-sky-500/30' },
+  pending_approval:   { label: 'Pending',    className: 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/15 dark:text-yellow-400 dark:border-yellow-500/30' },
+  pending_resolution: { label: 'Resolving',  className: 'bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30' },
+  resolved:           { label: 'Resolved',   className: 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30' },
+  rejected:           { label: 'Rejected',   className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/30' },
 }
 
 export function MarketCard({ market }: MarketCardProps) {
@@ -55,7 +55,7 @@ export function MarketCard({ market }: MarketCardProps) {
 
   return (
     <Link href={`/markets/${market.id}`}>
-      <div className="group rounded-2xl border border-white/8 bg-card hover:border-sky-500/40 hover:bg-sky-500/5 transition-all duration-200 p-4 h-full flex flex-col gap-3 cursor-pointer">
+      <div className="group rounded-xl border border-border bg-card shadow-sm hover:shadow-md hover:border-primary/40 dark:border-white/8 dark:hover:border-sky-500/40 transition-all duration-200 p-4 h-full flex flex-col gap-3 cursor-pointer">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -65,22 +65,22 @@ export function MarketCard({ market }: MarketCardProps) {
                 {status.label}
               </span>
               {market.market_type === 'personal_score' && market.subject_name && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30">
                   📊 {market.subject_name}
                 </span>
               )}
               {isSports && market.sport && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/30">
                   🏆 {market.sport}
                 </span>
               )}
               {isSatAct && market.sport && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30">
                   📝 {market.sport}
                 </span>
               )}
             </div>
-            <h3 className="text-sm font-semibold leading-snug text-foreground group-hover:text-sky-200 transition-colors line-clamp-2">
+            <h3 className="text-sm font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2">
               {market.title}
             </h3>
           </div>
@@ -93,30 +93,30 @@ export function MarketCard({ market }: MarketCardProps) {
           ) : (
             <div className="space-y-2">
               <div className="flex gap-2">
-                <div className="flex-1 rounded-lg bg-sky-500/10 border border-sky-500/20 py-2 px-3 text-center">
-                  <p className="text-base font-bold text-sky-400">{yesPct}%</p>
-                  <p className="text-[10px] text-sky-400/60 truncate">{yesLabel}</p>
+                <div className="flex-1 rounded-lg border border-green-200 dark:border-sky-500/20 bg-green-50 dark:bg-sky-500/10 py-2 px-3 text-center">
+                  <p className="text-base font-bold text-green-700 dark:text-sky-400">{yesPct}%</p>
+                  <p className="text-[10px] text-green-600/70 dark:text-sky-400/60 truncate">{yesLabel}</p>
                 </div>
-                <div className="flex-1 rounded-lg bg-orange-500/10 border border-orange-500/20 py-2 px-3 text-center">
-                  <p className="text-base font-bold text-orange-400">{noPct}%</p>
-                  <p className="text-[10px] text-orange-400/60 truncate">{noLabel}</p>
+                <div className="flex-1 rounded-lg border border-red-200 dark:border-orange-500/20 bg-red-50 dark:bg-orange-500/10 py-2 px-3 text-center">
+                  <p className="text-base font-bold text-red-600 dark:text-orange-400">{noPct}%</p>
+                  <p className="text-[10px] text-red-600/70 dark:text-orange-400/60 truncate">{noLabel}</p>
                 </div>
               </div>
-              <div className="h-1 rounded-full bg-orange-500/20 overflow-hidden">
-                <div className="h-full bg-sky-500 transition-all duration-300" style={{ width: `${yesPct}%` }} />
+              <div className="h-1 rounded-full bg-red-100 dark:bg-orange-500/20 overflow-hidden">
+                <div className="h-full bg-green-500 dark:bg-sky-500 transition-all duration-300" style={{ width: `${yesPct}%` }} />
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-white/5">
+        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border">
           <span>{total.toLocaleString()} coins</span>
           {market.closes_at && (
             <span>Closes {new Date(market.closes_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
           )}
           {market.status === 'resolved' && market.outcome && (
-            <span className="text-purple-400 font-medium">→ {market.outcome}</span>
+            <span className="text-purple-700 dark:text-purple-400 font-medium">→ {market.outcome}</span>
           )}
         </div>
       </div>

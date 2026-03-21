@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 222 47% 5%;
-    --foreground: 215 30% 93%;
-    --card: 222 47% 8%;
-    --card-foreground: 215 30% 93%;
-    --popover: 222 47% 8%;
-    --popover-foreground: 215 30% 93%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 222 47% 5%;
-    --secondary: 220 40% 13%;
-    --secondary-foreground: 215 30% 93%;
-    --muted: 220 38% 13%;
-    --muted-foreground: 215 20% 52%;
-    --accent: 199 89% 48%;
-    --accent-foreground: 222 47% 5%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 38% 17%;
-    --input: 220 38% 17%;
-    --ring: 199 89% 48%;
+    --background: 220 14% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 89%;
+    --input: 214 32% 89%;
+    --ring: 243 75% 59%;
     --radius: 0.75rem;
   }
 
@@ -51,16 +51,10 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
 }

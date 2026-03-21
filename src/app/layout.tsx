@@ -32,12 +32,22 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var t = localStorage.getItem('theme');
+              if (t === 'dark') document.documentElement.classList.add('dark');
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
       <body className={`${inter.className} antialiased bg-background text-foreground`}>
         <Providers>
           <Navbar />
           {needsRules && <RulesGate />}
-          <main className="max-w-5xl mx-auto px-4 py-8">
+          <main className="max-w-7xl mx-auto px-4 py-8">
             {children}
           </main>
           <Toaster />
