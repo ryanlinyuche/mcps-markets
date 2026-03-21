@@ -161,6 +161,8 @@ export default function SubmitMarketPage() {
   const [teacherQuote, setTeacherQuote] = useState('')
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
+  const [teacherQuoteSubtype, setTeacherQuoteSubtype] = useState<'yesno' | 'overunder'>('yesno')
+  const [teacherQuoteThreshold, setTeacherQuoteThreshold] = useState('')
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -185,13 +187,21 @@ export default function SubmitMarketPage() {
     const teacher = selectedPeriod?.teacher || (periodClass ? `Period ${periodClass} teacher` : 'the teacher')
     const quote = teacherQuote.trim()
     if (quote) {
-      setTitle(`Will ${teacher} say "${quote}" in class?`)
+      if (teacherQuoteSubtype === 'overunder' && teacherQuoteThreshold) {
+        setTitle(`Will ${teacher} say "${quote}" more than ${teacherQuoteThreshold} time${Number(teacherQuoteThreshold) === 1 ? '' : 's'} in class?`)
+      } else {
+        setTitle(`Will ${teacher} say "${quote}" in class?`)
+      }
     } else {
       setTitle('')
     }
-    setResolutionCriteria('Resolved YES if the market creator provides clear video evidence of the teacher saying this phrase during class. Resolved NO if the market closes without video proof.')
+    if (teacherQuoteSubtype === 'overunder') {
+      setResolutionCriteria(`Resolved YES if the market creator provides video evidence of the teacher saying this phrase more than ${teacherQuoteThreshold || '?'} time${Number(teacherQuoteThreshold) === 1 ? '' : 's'} during class. Resolved NO otherwise.`)
+    } else {
+      setResolutionCriteria('Resolved YES if the market creator provides clear video evidence of the teacher saying this phrase during class. Resolved NO if the market closes without video proof.')
+    }
     setResolutionSource('Video recording submitted by market creator')
-  }, [marketType, teacherQuote, periodClass, schedule])
+  }, [marketType, teacherQuote, periodClass, schedule, teacherQuoteSubtype, teacherQuoteThreshold])
 
   const isScoreType = marketType === 'score' || marketType === 'personal_score'
   const isTeacherQuote = marketType === 'teacher_quote'
@@ -232,6 +242,9 @@ export default function SubmitMarketPage() {
     if (isTeacherQuote && !teacherQuote.trim()) {
       toast.error('Enter the phrase you expect the teacher to say'); return
     }
+    if (isTeacherQuote && teacherQuoteSubtype === 'overunder' && !teacherQuoteThreshold) {
+      toast.error('Enter a count threshold for the over/under bet'); return
+    }
 
     setLoading(true)
     try {
@@ -247,9 +260,14 @@ export default function SubmitMarketPage() {
         sport: marketType === 'sports' ? sport : marketType === 'sat_act' ? satActType : null,
         team_a: marketType === 'sports' && sportsSubtype === 'matchup' ? teamA.trim() || null : null,
         team_b: marketType === 'sports' && sportsSubtype === 'matchup' ? teamB.trim() || null : null,
-        score_subtype: isScoreType ? scoreSubtype : marketType === 'sat_act' ? 'overunder' : null,
+        score_subtype: isScoreType ? scoreSubtype
+          : marketType === 'sat_act' ? 'overunder'
+          : isTeacherQuote ? teacherQuoteSubtype
+          : null,
         score_threshold: (isScoreType && scoreSubtype === 'overunder') || marketType === 'sat_act'
           ? Number(scoreThreshold)
+          : (isTeacherQuote && teacherQuoteSubtype === 'overunder')
+          ? Number(teacherQuoteThreshold)
           : null,
       }
 
@@ -374,6 +392,54 @@ export default function SubmitMarketPage() {
                       </p>
                     )}
                   </div>
+
+                  <div className="space-y-1">
+                    <Label>Bet Style</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTeacherQuoteSubtype('yesno')}
+                        className={`rounded-md border px-3 py-2.5 text-sm font-medium text-left transition-colors ${
+                          teacherQuoteSubtype === 'yesno'
+                            ? 'border-amber-500 bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            : 'hover:bg-muted bg-background'
+                        }`}
+                      >
+                        <div className="font-semibold">Yes / No</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">Will they say it at all?</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTeacherQuoteSubtype('overunder')}
+                        className={`rounded-md border px-3 py-2.5 text-sm font-medium text-left transition-colors ${
+                          teacherQuoteSubtype === 'overunder'
+                            ? 'border-amber-500 bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            : 'hover:bg-muted bg-background'
+                        }`}
+                      >
+                        <div className="font-semibold">Over / Under</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">How many times?</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {teacherQuoteSubtype === 'overunder' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Count Threshold</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={teacherQuoteThreshold}
+                        onChange={e => setTeacherQuoteThreshold(e.target.value)}
+                        placeholder="e.g. 3"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        YES = says it more than <strong>{teacherQuoteThreshold || '?'}</strong> times · NO = says it {teacherQuoteThreshold || '?'} times or fewer
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <Label htmlFor="teacher-quote-input">
