@@ -180,15 +180,30 @@ export default function SubmitMarketPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marketType])
 
+  // Format a datetime-local string into "Dec 20, 2:30 PM"
+  function formatCloseDate(dt: string) {
+    if (!dt) return null
+    try {
+      return new Date(dt).toLocaleString('en-US', {
+        month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      })
+    } catch { return null }
+  }
+
   // Auto-generate title and pre-fill resolution fields for Teacher Quote
   useEffect(() => {
     if (marketType !== 'teacher_quote') return
     const selectedPeriod = schedule.find(c => c.period === periodClass)
     const teacher = selectedPeriod?.teacher || (periodClass ? `Period ${periodClass} teacher` : 'the teacher')
     const quote = teacherQuote.trim()
+    const threshold = teacherQuoteThreshold ? `${Number(teacherQuoteThreshold)}.5` : '?.5'
+    const dateLabel = formatCloseDate(closesAt)
+
     if (quote) {
-      if (teacherQuoteSubtype === 'overunder' && teacherQuoteThreshold) {
-        setTitle(`Will ${teacher} say "${quote}" more than ${teacherQuoteThreshold} time${Number(teacherQuoteThreshold) === 1 ? '' : 's'} in class?`)
+      if (teacherQuoteSubtype === 'overunder') {
+        const datePart = dateLabel ? ` before ${dateLabel}` : ''
+        setTitle(`Will ${teacher} say "${quote}" more than ${threshold} times in class${datePart}?`)
       } else {
         setTitle(`Will ${teacher} say "${quote}" in class?`)
       }
@@ -196,12 +211,13 @@ export default function SubmitMarketPage() {
       setTitle('')
     }
     if (teacherQuoteSubtype === 'overunder') {
-      setResolutionCriteria(`Resolved YES if the market creator provides video evidence of the teacher saying this phrase more than ${teacherQuoteThreshold || '?'} time${Number(teacherQuoteThreshold) === 1 ? '' : 's'} during class. Resolved NO otherwise.`)
+      setResolutionCriteria(`Resolved YES if the market creator provides video evidence of the teacher saying this phrase more than ${threshold} times during class. Resolved NO otherwise.`)
     } else {
       setResolutionCriteria('Resolved YES if the market creator provides clear video evidence of the teacher saying this phrase during class. Resolved NO if the market closes without video proof.')
     }
     setResolutionSource('Video recording submitted by market creator')
-  }, [marketType, teacherQuote, periodClass, schedule, teacherQuoteSubtype, teacherQuoteThreshold])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketType, teacherQuote, periodClass, schedule, teacherQuoteSubtype, teacherQuoteThreshold, closesAt])
 
   const isScoreType = marketType === 'score' || marketType === 'personal_score'
   const isTeacherQuote = marketType === 'teacher_quote'
@@ -245,6 +261,9 @@ export default function SubmitMarketPage() {
     if (isTeacherQuote && teacherQuoteSubtype === 'overunder' && !teacherQuoteThreshold) {
       toast.error('Enter a count threshold for the over/under bet'); return
     }
+    if (isTeacherQuote && teacherQuoteSubtype === 'overunder' && !closesAt) {
+      toast.error('A close date/time is required for over/under Teacher Quote markets'); return
+    }
 
     setLoading(true)
     try {
@@ -267,7 +286,7 @@ export default function SubmitMarketPage() {
         score_threshold: (isScoreType && scoreSubtype === 'overunder') || marketType === 'sat_act'
           ? Number(scoreThreshold)
           : (isTeacherQuote && teacherQuoteSubtype === 'overunder')
-          ? Number(teacherQuoteThreshold)
+          ? Number(teacherQuoteThreshold) + 0.5
           : null,
       }
 
@@ -425,18 +444,24 @@ export default function SubmitMarketPage() {
 
                   {teacherQuoteSubtype === 'overunder' && (
                     <div className="space-y-1">
-                      <Label className="text-xs">Count Threshold</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={teacherQuoteThreshold}
-                        onChange={e => setTeacherQuoteThreshold(e.target.value)}
-                        placeholder="e.g. 3"
-                        required
-                      />
+                      <Label className="text-xs">Count (whole number)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99}
+                          value={teacherQuoteThreshold}
+                          onChange={e => setTeacherQuoteThreshold(e.target.value)}
+                          placeholder="e.g. 3"
+                          className="w-28"
+                          required
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          → threshold stored as <strong>{teacherQuoteThreshold ? `${teacherQuoteThreshold}.5` : '?.5'}</strong>
+                        </span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        YES = says it more than <strong>{teacherQuoteThreshold || '?'}</strong> times · NO = says it {teacherQuoteThreshold || '?'} times or fewer
+                        YES = says it <strong>more than {teacherQuoteThreshold ? `${teacherQuoteThreshold}.5` : '?.5'}</strong> times ({Number(teacherQuoteThreshold || 0) + 1}+) · NO = {Number(teacherQuoteThreshold || 0)} or fewer
                       </p>
                     </div>
                   )}
@@ -781,7 +806,10 @@ export default function SubmitMarketPage() {
                 {marketType === 'sat_act' && (
                   <p className="text-xs text-muted-foreground">Typically set to test day morning.</p>
                 )}
-                {isTeacherQuote && (
+                {isTeacherQuote && teacherQuoteSubtype === 'overunder' && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Required for over/under — appears in the market title.</p>
+                )}
+                {isTeacherQuote && teacherQuoteSubtype === 'yesno' && (
                   <p className="text-xs text-muted-foreground">Set to the end of the class period or a reasonable deadline.</p>
                 )}
               </div>
