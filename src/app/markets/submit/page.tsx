@@ -261,8 +261,8 @@ export default function SubmitMarketPage() {
     if (isTeacherQuote && teacherQuoteSubtype === 'overunder' && !teacherQuoteThreshold) {
       toast.error('Enter a count threshold for the over/under bet'); return
     }
-    if (isTeacherQuote && teacherQuoteSubtype === 'overunder' && !closesAt) {
-      toast.error('A close date/time is required for over/under Teacher Quote markets'); return
+    if (!closesAt) {
+      toast.error('A deadline is required for all markets'); return
     }
 
     setLoading(true)
@@ -793,21 +793,22 @@ export default function SubmitMarketPage() {
 
               {/* Closes At */}
               <div className="space-y-1">
-                <Label htmlFor="closesAt">Betting closes at (optional)</Label>
+                <Label htmlFor="closesAt">Deadline <span className="text-destructive">*</span></Label>
                 <Input
                   id="closesAt"
                   type="datetime-local"
                   value={closesAt}
                   onChange={e => setClosesAt(e.target.value)}
+                  required
                 />
                 {marketType === 'sports' && (
-                  <p className="text-xs text-muted-foreground">Typically set to game start time so no one bets after the game begins.</p>
+                  <p className="text-xs text-muted-foreground">Typically the game start time so no one bets after it begins.</p>
                 )}
                 {marketType === 'sat_act' && (
                   <p className="text-xs text-muted-foreground">Typically set to test day morning.</p>
                 )}
                 {isTeacherQuote && teacherQuoteSubtype === 'overunder' && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Required for over/under — appears in the market title.</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Also appears in the market title.</p>
                 )}
                 {isTeacherQuote && teacherQuoteSubtype === 'yesno' && (
                   <p className="text-xs text-muted-foreground">Set to the end of the class period or a reasonable deadline.</p>

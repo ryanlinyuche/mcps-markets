@@ -6,6 +6,102 @@ import { getSession } from '@/lib/session'
 import { computeOdds } from '@/lib/market-math'
 import { Market, Position, OptionPool } from '@/types'
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const marketId = Number(id)
+
+  const marketRes = await db.execute({ sql: 'SELECT * FROM markets WHERE id = ?', args: [marketId] })
+  const market = marketRes.rows[0] as unknown as { id: number; creator_id: number; status: string } | undefined
+  if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+
+  const isAdmin = !!session.isAdmin
+  const isCreator = Number(session.sub) === market.creator_id
+  if (!isAdmin && !isCreator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (market.status === 'resolved') return NextResponse.json({ error: 'Resolved markets cannot be edited' }, { status: 400 })
+
+  const { title, description, closes_at, resolution_criteria, resolution_source, school } = await request.json()
+  if (!title?.trim() || title.trim().length < 5) {
+    return NextResponse.json({ error: 'Title must be at least 5 characters' }, { status: 400 })
+  }
+  if (!closes_at) {
+    return NextResponse.json({ error: 'A deadline is required' }, { status: 400 })
+  }
+
+  if (isAdmin) {
+    await db.execute({
+      sql: `UPDATE markets SET title=?, description=?, closes_at=?, resolution_criteria=?, resolution_source=?, school=? WHERE id=?`,
+      args: [
+        title.trim(),
+        description?.trim() || null,
+        closes_at,
+        resolution_criteria?.trim() || null,
+        resolution_source?.trim() || null,
+        school?.trim() || null,
+        marketId,
+      ],
+    })
+  } else {
+    // Creator: reset to pending_approval for re-review
+    await db.execute({
+      sql: `UPDATE markets SET title=?, description=?, closes_at=?, resolution_criteria=?, resolution_source=?, status='pending_approval' WHERE id=?`,
+      args: [
+        title.trim(),
+        description?.trim() || null,
+        closes_at,
+        resolution_criteria?.trim() || null,
+        resolution_source?.trim() || null,
+        marketId,
+      ],
+    })
+  }
+
+  const updated = await db.execute({ sql: 'SELECT * FROM markets WHERE id = ?', args: [marketId] })
+  return NextResponse.json(updated.rows[0])
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession()
+  if (!session?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+  const marketId = Number(id)
+
+  const marketRes = await db.execute({ sql: 'SELECT id FROM markets WHERE id = ?', args: [marketId] })
+  if (!marketRes.rows[0]) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
+
+  // Refund all open positions
+  const posRes = await db.execute({
+    sql: 'SELECT user_id, coins_bet FROM positions WHERE market_id = ?',
+    args: [marketId],
+  })
+  for (const pos of posRes.rows as unknown as { user_id: number; coins_bet: number }[]) {
+    await db.execute({ sql: 'UPDATE users SET balance = balance + ? WHERE id = ?', args: [pos.coins_bet, pos.user_id] })
+    await db.execute({
+      sql: `INSERT INTO transactions (user_id, type, amount, market_id, description) VALUES (?, 'refund', ?, ?, 'Market deleted by admin')`,
+      args: [pos.user_id, pos.coins_bet, marketId],
+    })
+  }
+
+  // Delete related records in order
+  await db.execute({ sql: 'DELETE FROM notifications WHERE market_id = ?', args: [marketId] })
+  await db.execute({ sql: 'DELETE FROM resolution_flags WHERE market_id = ?', args: [marketId] })
+  await db.execute({ sql: 'DELETE FROM market_history WHERE market_id = ?', args: [marketId] })
+  await db.execute({ sql: 'DELETE FROM option_pools WHERE market_id = ?', args: [marketId] })
+  await db.execute({ sql: 'DELETE FROM positions WHERE market_id = ?', args: [marketId] })
+  await db.execute({ sql: 'DELETE FROM markets WHERE id = ?', args: [marketId] })
+
+  return NextResponse.json({ success: true })
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

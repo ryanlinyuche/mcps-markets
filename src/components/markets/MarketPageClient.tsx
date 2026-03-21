@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Market, OptionPool, Position } from '@/types'
 import { BettingPanel } from './BettingPanel'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
-import { Info, ImagePlus, ShieldCheck, Send, Clock, TrendingUp } from 'lucide-react'
+import { Info, ImagePlus, ShieldCheck, Send, Clock, TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -458,8 +458,21 @@ export function MarketPageClient({
   const bettingClosed = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) < new Date()
   const showResolutionPanel = isLoggedIn && (market.status === 'open' || (isCreator && market.status === 'pending_resolution'))
 
-  // Suppress unused variable warning
-  void isAdmin
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/markets/${initialMarket.id}`, { method: 'DELETE' })
+      if (!res.ok) { toast.error('Failed to delete market'); setDeleting(false); return }
+      toast.success('Market deleted — all bets refunded')
+      router.push('/markets')
+    } catch {
+      toast.error('Something went wrong')
+      setDeleting(false)
+    }
+  }
 
   useEffect(() => { setMarket(initialMarket) }, [initialMarket])
   useEffect(() => { if (initialOptionPools) setOptionPools(initialOptionPools) }, [initialOptionPools])
@@ -622,6 +635,51 @@ export function MarketPageClient({
                 <CoinDisplay amount={pos.coins_bet} size="sm" />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Edit / Delete — admin or creator */}
+        {(isAdmin || isCreator) && market.status !== 'resolved' && (
+          <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {isAdmin ? 'Admin Actions' : 'Your Market'}
+            </p>
+            <Link
+              href={`/markets/${initialMarket.id}/edit`}
+              className="flex items-center gap-2 w-full rounded-xl border border-border bg-muted/50 hover:bg-muted px-3 py-2.5 text-sm font-medium transition-colors"
+            >
+              <Pencil size={14} /> Edit Market Details
+            </Link>
+            {isAdmin && !confirmDelete && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 w-full rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-2.5 text-sm font-medium text-red-700 dark:text-red-400 transition-colors"
+              >
+                <Trash2 size={14} /> Delete Market
+              </button>
+            )}
+            {isAdmin && confirmDelete && (
+              <div className="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 space-y-2">
+                <p className="text-xs text-red-700 dark:text-red-400 font-medium">
+                  Delete this market? All bets will be refunded. This cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? 'Deleting…' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

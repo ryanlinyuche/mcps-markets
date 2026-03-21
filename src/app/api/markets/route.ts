@@ -98,6 +98,9 @@ export async function POST(request: NextRequest) {
   if (!title || title.trim().length < 5) {
     return NextResponse.json({ error: 'Title must be at least 5 characters' }, { status: 400 })
   }
+  if (!closes_at) {
+    return NextResponse.json({ error: 'A deadline is required for all markets' }, { status: 400 })
+  }
 
   const creatorId = Number(session.sub)
   const isPersonalScore = market_type === 'personal_score'
