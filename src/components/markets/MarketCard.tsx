@@ -55,7 +55,7 @@ export function MarketCard({ market }: MarketCardProps) {
 
   return (
     <Link href={`/markets/${market.id}`}>
-      <div className="group rounded-xl border border-border bg-card shadow-sm hover:shadow-md hover:border-primary/40 dark:border-white/8 dark:hover:border-sky-500/40 transition-all duration-200 p-4 h-full flex flex-col gap-3 cursor-pointer">
+      <div className="group rounded-xl border border-border bg-card shadow-sm hover:shadow-md hover:border-primary/40 dark:border-white/8 dark:hover:border-sky-500/40 transition-all duration-200 p-3.5 h-full min-h-[230px] flex flex-col gap-2.5 cursor-pointer">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
