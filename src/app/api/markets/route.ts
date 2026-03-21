@@ -103,11 +103,13 @@ export async function POST(request: NextRequest) {
   const isPersonalScore = market_type === 'personal_score'
   const isSports = market_type === 'sports'
   const isSatAct = market_type === 'sat_act'
-  const type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act' =
+  const isTeacherQuote = market_type === 'teacher_quote'
+  const type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act' | 'teacher_quote' =
     isPersonalScore ? 'personal_score'
     : market_type === 'score' ? 'score'
     : isSports ? 'sports'
     : isSatAct ? 'sat_act'
+    : isTeacherQuote ? 'teacher_quote'
     : 'yesno'
 
   const subjectUserId = (isPersonalScore || isSatAct) ? creatorId : null
@@ -120,6 +122,11 @@ export async function POST(request: NextRequest) {
     if (!enrolledRes.rows[0]) {
       return NextResponse.json({ error: 'You must be enrolled in this class to create a market for it' }, { status: 403 })
     }
+  }
+
+  // Teacher quote markets require a period
+  if (isTeacherQuote && !period_class) {
+    return NextResponse.json({ error: 'A class period is required for Teacher Quote markets' }, { status: 400 })
   }
 
   const resolvedSchool = isSports ? 'Sports' : (school?.trim() || 'Winston Churchill High School')
@@ -139,7 +146,7 @@ export async function POST(request: NextRequest) {
       closes_at || null,
       resolution_criteria?.trim() || null,
       resolution_source?.trim() || null,
-      (type === 'score' || type === 'personal_score') ? (period_class || null) : null,
+      (type === 'score' || type === 'personal_score' || isTeacherQuote) ? (period_class || null) : null,
       (isSports || isSatAct) ? (sport || null) : null,
       isSports ? (team_a?.trim() || null) : null,
       isSports ? (team_b?.trim() || null) : null,

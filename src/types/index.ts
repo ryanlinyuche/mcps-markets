@@ -29,7 +29,7 @@ export interface Market {
   title: string
   description: string | null
   school: string
-  market_type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act'
+  market_type: 'yesno' | 'score' | 'personal_score' | 'sports' | 'sat_act' | 'teacher_quote'
   creator_id: number
   creator_name?: string
   status: 'pending_approval' | 'open' | 'rejected' | 'resolved' | 'pending_resolution'
