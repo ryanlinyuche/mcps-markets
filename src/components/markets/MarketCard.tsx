@@ -44,7 +44,12 @@ export function MarketCard({ market }: MarketCardProps) {
   const isSports = market.market_type === 'sports'
   const isSatAct = market.market_type === 'sat_act'
   const isOverUnder = market.score_subtype === 'overunder'
-  const status = statusConfig[market.status] ?? { label: market.status, className: 'bg-muted text-muted-foreground' }
+
+  // A market with status='open' but a closes_at in the past is effectively closed
+  const isPastClose = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) <= new Date()
+  const effectiveStatus = isPastClose ? 'closed' : market.status
+  const closedConfig = { label: 'Closed', className: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-500/15 dark:text-slate-400 dark:border-slate-500/30' }
+  const status = isPastClose ? closedConfig : (statusConfig[effectiveStatus] ?? { label: market.status, className: 'bg-muted text-muted-foreground' })
   const total = isScore && market.option_pools
     ? market.option_pools.reduce((s, o) => s + o.amount, 0)
     : market.yes_pool + market.no_pool
