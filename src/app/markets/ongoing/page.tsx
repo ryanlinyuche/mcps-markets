@@ -41,13 +41,17 @@ async function fetchMarkets() {
 export default async function OngoingMarketsPage() {
   const markets = await fetchMarkets()
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">Ongoing Markets</h1>
         <p className="text-sm text-muted-foreground">{markets.length} market{markets.length !== 1 ? 's' : ''} open for betting</p>
       </div>
       {markets.length === 0 ? (
-        <p className="text-center py-16 text-muted-foreground">No ongoing markets right now.</p>
+        <div className="text-center py-20 text-muted-foreground">
+          <p className="text-4xl mb-3">📊</p>
+          <p className="font-medium">No ongoing markets right now.</p>
+          <p className="text-sm mt-1">Check back soon or submit one!</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {markets.map(m => <MarketCard key={m.id} market={m} />)}

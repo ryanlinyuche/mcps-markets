@@ -8,7 +8,7 @@ import { OddsDisplay } from './OddsDisplay'
 import { Info, ImagePlus, Clock, Send, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
-const PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
+const PALETTE = ['#38bdf8', '#f97316', '#34d399', '#a78bfa', '#fbbf24']
 
 function computeScoreOdds(options: OptionPool[]) {
   const total = options.reduce((s, o) => s + o.amount, 0)
@@ -56,7 +56,7 @@ function OddsChart({ history }: { history: HistoryPoint[] }) {
     setTooltip({ x: toX(idx), y: toY(points[idx]), pct: points[idx] })
   }
   return (
-    <div className="rounded-lg border p-4 space-y-2">
+    <div className="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
       <div className="flex justify-between items-center">
         <p className="text-xs font-medium text-muted-foreground">YES probability over time</p>
         <span className="text-sm font-bold px-2 py-0.5 rounded-full" style={{ color, background: color + '18' }}>
@@ -70,12 +70,12 @@ function OddsChart({ history }: { history: HistoryPoint[] }) {
           const y = toY(v)
           return (
             <g key={v}>
-              <line x1={PAD_LEFT - 4} y1={y} x2={W - PAD_RIGHT} y2={y} stroke="#e5e7eb" strokeWidth="1" strokeDasharray={v === 50 ? '4,4' : '2,2'} />
-              <text x={PAD_LEFT - 6} y={y + 3.5} textAnchor="end" fontSize="9" fill="#9ca3af">{v}%</text>
+              <line x1={PAD_LEFT - 4} y1={y} x2={W - PAD_RIGHT} y2={y} stroke="#1e2a3a" strokeWidth="1" strokeDasharray={v === 50 ? '4,4' : '2,2'} />
+              <text x={PAD_LEFT - 6} y={y + 3.5} textAnchor="end" fontSize="9" fill="#4a6080">{v}%</text>
             </g>
           )
         })}
-        {!isPlaceholder && <path d={areaPath} fill={color} fillOpacity="0.08" />}
+        {!isPlaceholder && <path d={areaPath} fill={color} fillOpacity="0.12" />}
         <path d={linePath} fill="none" stroke={isPlaceholder ? '#e5e7eb' : color} strokeWidth="2"
           strokeLinejoin="round" strokeLinecap="round" strokeDasharray={isPlaceholder ? '6,4' : undefined} />
         {!isPlaceholder && <circle cx={toX(points.length - 1)} cy={toY(last)} r="3.5" fill={color} />}
@@ -83,7 +83,7 @@ function OddsChart({ history }: { history: HistoryPoint[] }) {
           <g>
             <line x1={tooltip.x} y1={PAD_TOP} x2={tooltip.x} y2={H - PAD_BOTTOM} stroke="#6b7280" strokeWidth="1" strokeDasharray="3,2" />
             <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={color} />
-            <rect x={Math.min(tooltip.x + 6, W - 70)} y={tooltip.y - 16} width={62} height={18} rx="4" fill="#1f2937" fillOpacity="0.85" />
+            <rect x={Math.min(tooltip.x + 6, W - 70)} y={tooltip.y - 16} width={62} height={18} rx="4" fill="#0d1526" fillOpacity="0.85" />
             <text x={Math.min(tooltip.x + 9, W - 67)} y={tooltip.y - 3} fontSize="10" fill="white">{Math.round(tooltip.pct)}% YES</text>
           </g>
         )}
@@ -101,7 +101,7 @@ function ScoreChart({ history, options }: { history: ScoreHistoryPoint[]; option
   const W = 500, H = 110, PAD_LEFT = 36, PAD_RIGHT = 8, PAD_TOP = 8, PAD_BOTTOM = 20
   if (history.length < 2) {
     return (
-      <div className="rounded-lg border p-4 space-y-2">
+      <div className="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Option percentages over time</p>
         <div className="h-20 flex items-center justify-center">
           <p className="text-xs text-muted-foreground italic">Chart will appear after the first bet</p>
@@ -117,13 +117,13 @@ function ScoreChart({ history, options }: { history: ScoreHistoryPoint[]; option
   const toX = (i: number) => PAD_LEFT + (i / Math.max(history.length - 1, 1)) * (W - PAD_LEFT - PAD_RIGHT)
   const toY = (v: number) => PAD_TOP + ((100 - v) / 100) * (H - PAD_TOP - PAD_BOTTOM)
   return (
-    <div className="rounded-lg border p-4 space-y-2">
+    <div className="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Option percentages over time</p>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" preserveAspectRatio="none">
         {[0, 50, 100].map(v => (
           <g key={v}>
-            <line x1={PAD_LEFT} y1={toY(v)} x2={W - PAD_RIGHT} y2={toY(v)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray={v === 50 ? '4,4' : '2,2'} />
-            <text x={PAD_LEFT - 6} y={toY(v) + 3.5} textAnchor="end" fontSize="9" fill="#9ca3af">{v}%</text>
+            <line x1={PAD_LEFT} y1={toY(v)} x2={W - PAD_RIGHT} y2={toY(v)} stroke="#1e2a3a" strokeWidth="1" strokeDasharray={v === 50 ? '4,4' : '2,2'} />
+            <text x={PAD_LEFT - 6} y={toY(v) + 3.5} textAnchor="end" fontSize="9" fill="#4a6080">{v}%</text>
           </g>
         ))}
         {allPoints.map((pts, i) => {
@@ -156,7 +156,7 @@ function ResolutionInfo({
   if (!hasInfo && !isResolved && !isPending) return null
 
   return (
-    <div className="rounded-lg border p-4 space-y-3">
+    <div className="rounded-2xl border border-white/8 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Info size={15} className="text-muted-foreground shrink-0" />
         <h3 className="text-sm font-semibold">Resolution Info</h3>
@@ -257,12 +257,12 @@ function RequestResolutionPanel({
 
   if (market.status === 'pending_resolution') {
     return (
-      <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 space-y-2">
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
         <div className="flex items-center gap-2">
-          <ShieldCheck size={16} className="text-yellow-700 shrink-0" />
-          <p className="text-sm font-semibold text-yellow-900">Resolution Pending Admin Approval</p>
+          <ShieldCheck size={16} className="text-amber-400 shrink-0" />
+          <p className="text-sm font-semibold text-amber-300">Resolution Pending Admin Approval</p>
         </div>
-        <p className="text-sm text-yellow-800">
+        <p className="text-sm text-amber-400/80">
           Proposed outcome: <span className="font-bold">{market.pending_outcome}</span>. An admin will review the proof and finalize the resolution.
         </p>
       </div>
@@ -270,9 +270,9 @@ function RequestResolutionPanel({
   }
 
   return (
-    <div className="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 p-4 space-y-4">
+    <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <ShieldCheck size={16} className="text-primary shrink-0" />
+        <ShieldCheck size={16} className="text-sky-400 shrink-0" />
         <p className="text-sm font-semibold">Request Resolution</p>
         <span className="text-xs text-muted-foreground">
           {isCreator ? '(you created this market)' : 'Know the outcome? Upload proof for admin review.'}
@@ -387,22 +387,22 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
   return (
     <>
       {market.market_type === 'personal_score' && market.subject_name && (
-        <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 flex items-center gap-2">
+        <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 px-4 py-2 flex items-center gap-2">
           <span className="text-sm">&#x1F4CA;</span>
-          <p className="text-sm font-medium text-purple-800">
+          <p className="text-sm font-medium text-purple-300">
             This market predicts <span className="font-bold">{market.subject_name}</span>&apos;s personal score
           </p>
         </div>
       )}
 
       {isScore && displayedOptionPools ? (
-        <div className="rounded-lg border divide-y">
+        <div className="rounded-2xl border border-white/8 divide-y divide-white/5">
           {displayedOptionPools.map(opt => (
             <div key={opt.label} className="flex items-center gap-3 px-4 py-2.5">
               <div className="flex-1">
                 <p className="text-sm font-medium">{opt.label}</p>
-                <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all duration-500"
+                <div className="mt-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+                  <div className="h-full rounded-full bg-sky-500 transition-all duration-500"
                     style={{ width: `${Math.round((opt.price ?? 0) * 100)}%` }} />
                 </div>
               </div>
@@ -421,7 +421,7 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
       }
 
       {market.status === 'resolved' && market.outcome && (
-        <div className={`rounded-lg p-4 text-center font-semibold text-lg ${market.outcome === 'N/A' ? 'bg-gray-50 text-gray-700' : 'bg-green-50 text-green-700'}`}>
+        <div className={`rounded-2xl p-4 text-center font-semibold text-lg ${market.outcome === 'N/A' ? 'bg-white/5 border border-white/10 text-muted-foreground' : 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-400'}`}>
           Resolved: {market.outcome}
           {market.outcome === 'N/A' && (
             <span className="block text-sm font-normal text-muted-foreground mt-1">All bets have been refunded</span>
@@ -441,12 +441,12 @@ export function MarketLive({ initialMarket, userBalance, initialOptionPools, ini
       )}
 
       {market.status === 'pending_resolution' ? (
-        <div className="rounded-lg border bg-yellow-50 border-yellow-200 p-4 flex items-center gap-2 text-sm text-yellow-800">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-center gap-2 text-sm text-amber-400">
           <Clock size={15} className="shrink-0" />
           Betting closed &mdash; resolution pending admin approval
         </div>
       ) : bettingClosed ? (
-        <div className="rounded-lg border bg-amber-50 border-amber-200 p-4 flex items-center gap-2 text-sm text-amber-800">
+        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center gap-2 text-sm text-yellow-400">
           <Clock size={15} className="shrink-0" />
           Betting closed &mdash; awaiting resolution
         </div>

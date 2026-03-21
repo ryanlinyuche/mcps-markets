@@ -82,73 +82,90 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   }
 
   const statusBadge = {
-    open: 'bg-green-100 text-green-800',
-    pending_approval: 'bg-yellow-100 text-yellow-800',
-    pending_resolution: 'bg-yellow-100 text-yellow-800',
-    resolved: 'bg-gray-100 text-gray-700',
-    rejected: 'bg-red-100 text-red-700',
-  }[market.status] || ''
+    open: 'bg-sky-500/15 text-sky-400 border border-sky-500/30',
+    pending_approval: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
+    pending_resolution: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+    resolved: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+    rejected: 'bg-red-500/15 text-red-400 border border-red-500/30',
+  }[market.status] || 'bg-muted text-muted-foreground'
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4">
       <Link href="/markets" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft size={14} /> Back to markets
       </Link>
 
+      {/* Title area */}
       <div className="space-y-2">
         <div className="flex items-start gap-2 flex-wrap">
-          <h1 className="text-xl font-bold flex-1">{market.title}</h1>
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusBadge}`}>
-            {market.status === 'pending_approval' ? 'Pending' : market.status === 'pending_resolution' ? 'Pending Resolution' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
+          <h1 className="text-2xl font-bold flex-1 leading-tight">{market.title}</h1>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusBadge}`}>
+            {market.status === 'pending_approval' ? 'Pending' : market.status === 'pending_resolution' ? 'Resolving' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
           </span>
         </div>
-        {market.market_type === 'score' && (
-          <p className="text-xs font-medium text-blue-600 bg-blue-50 rounded px-2 py-0.5 w-fit">
-            Test Score Market
-          </p>
-        )}
-        {market.market_type === 'personal_score' && (
-          <p className="text-xs font-medium text-purple-700 bg-purple-50 rounded px-2 py-0.5 w-fit">
-            &#x1F4CA; Personal Score &mdash; {market.subject_name ?? 'Unknown'}
-          </p>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {market.market_type === 'score' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30">
+              Class Score Market
+            </span>
+          )}
+          {market.market_type === 'personal_score' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30">
+              📊 {market.subject_name ?? 'Personal Score'}
+            </span>
+          )}
+          {market.market_type === 'sat_act' && market.sport && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
+              📝 {market.sport}
+            </span>
+          )}
+        </div>
         {market.description && (
           <p className="text-muted-foreground text-sm">{market.description}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          Submitted by {market.creator_name}
-          {market.closes_at && ` · Betting closes ${new Date(market.closes_at).toLocaleString('en-US')}`}
-          {' · '}<Link href={`/schools/${encodeURIComponent(market.school)}`} className="hover:underline">{market.school}</Link>
+          by {market.creator_name}
+          {market.closes_at && ` · Closes ${new Date(market.closes_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}`}
+          {' · '}<Link href={`/schools/${encodeURIComponent(market.school)}`} className="hover:text-foreground transition-colors">{market.school}</Link>
         </p>
       </div>
 
-      <MarketLive
-        initialMarket={enrichedMarket}
-        userBalance={userBalance}
-        initialOptionPools={optionPools}
-        initialHistory={history}
-        isLoggedIn={!!session}
-        isCreator={!!session && Number(session.sub) === market.creator_id}
-        isAdmin={!!session?.isAdmin}
-      />
-
-      {userPositions.length > 0 && (
-        <div className="rounded-lg border p-4 space-y-2">
-          <h3 className="font-semibold text-sm">Your Positions</h3>
-          {userPositions.map(pos => (
-            <div key={pos.id} className="flex justify-between items-center text-sm">
-              <span className={
-                pos.side === 'YES' ? 'text-green-600 font-medium' :
-                pos.side === 'NO' ? 'text-red-500 font-medium' :
-                'font-medium'
-              }>
-                {pos.side}
-              </span>
-              <CoinDisplay amount={pos.coins_bet} size="sm" />
-            </div>
-          ))}
+      {/* Two-column layout */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left: chart + resolution info */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <MarketLive
+            initialMarket={enrichedMarket}
+            userBalance={userBalance}
+            initialOptionPools={optionPools}
+            initialHistory={history}
+            isLoggedIn={!!session}
+            isCreator={!!session && Number(session.sub) === market.creator_id}
+            isAdmin={!!session?.isAdmin}
+          />
         </div>
-      )}
+
+        {/* Right: positions */}
+        {userPositions.length > 0 && (
+          <div className="lg:w-72 w-full">
+            <div className="rounded-2xl border border-white/8 bg-card p-4 space-y-3 lg:sticky lg:top-20">
+              <h3 className="font-semibold text-sm">Your Positions</h3>
+              {userPositions.map(pos => (
+                <div key={pos.id} className="flex justify-between items-center text-sm rounded-xl bg-white/4 px-3 py-2">
+                  <span className={
+                    pos.side === 'YES' ? 'text-sky-400 font-semibold' :
+                    pos.side === 'NO' ? 'text-orange-400 font-semibold' :
+                    'font-semibold text-purple-400'
+                  }>
+                    {pos.side}
+                  </span>
+                  <CoinDisplay amount={pos.coins_bet} size="sm" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

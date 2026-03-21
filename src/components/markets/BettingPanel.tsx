@@ -2,10 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Market, OptionPool } from '@/types'
 import { toast } from 'sonner'
+import { Coins } from 'lucide-react'
 
 interface BettingPanelProps {
   market: Market
@@ -14,61 +13,53 @@ interface BettingPanelProps {
   onBetSuccess?: (newBalance: number) => void
 }
 
+const PRESETS = [25, 100, 250]
+
 export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }: BettingPanelProps) {
   const router = useRouter()
   const isScore = market.market_type === 'score' || market.market_type === 'personal_score'
   const isSports = market.market_type === 'sports'
-  const yesLabel = isSports && market.team_a ? market.team_a : 'YES'
-  const noLabel = isSports && market.team_b ? market.team_b : 'NO'
+  const isOverUnder = market.score_subtype === 'overunder'
+  const isSatAct = market.market_type === 'sat_act'
+  const useYesNo = !isScore || isOverUnder || isSatAct
 
-  const defaultSide = isScore
-    ? (optionPools?.[0]?.label ?? '')
+  const yesLabel = isSports && market.team_a ? market.team_a
+    : (isOverUnder || isSatAct) && market.score_threshold ? `Over ${market.score_threshold}`
     : 'YES'
+  const noLabel = isSports && market.team_b ? market.team_b
+    : (isOverUnder || isSatAct) && market.score_threshold ? `Under ${market.score_threshold}`
+    : 'NO'
 
+  const defaultSide = isScore && !isOverUnder && !isSatAct ? (optionPools?.[0]?.label ?? '') : 'YES'
   const [side, setSide] = useState<string>(defaultSide)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
 
   const coins = Math.floor(Number(amount))
-
-  // --- Yes/No share math ---
-  // price is per-share cost in coins (e.g. 60 coins buys 1 share at 60% odds)
   const price = side === 'YES' ? (market.yes_price ?? 0.5) : (market.no_price ?? 0.5)
-  const priceCoins = price * 100  // e.g. 60 coins = 60c per share
+  const priceCoins = price * 100
   const shares = coins > 0 && priceCoins > 0 ? coins / priceCoins : 0
-  // Each share pays 100 coins if you win
   const yesnoReturn = Math.floor(shares * 100)
   const yesnoProfit = yesnoReturn - coins
 
-  // --- Score market payout ---
   const selectedPool = optionPools?.find(o => o.label === side)
   const totalScorePool = optionPools?.reduce((s, o) => s + o.amount, 0) ?? 0
   const scoreReturn = coins > 0 && selectedPool
-    ? Math.floor(
-        selectedPool.amount === 0
-          ? coins * (optionPools?.length ?? 5)
-          : (coins / (selectedPool.amount + coins)) * (totalScorePool + coins)
-      )
+    ? Math.floor(selectedPool.amount === 0
+        ? coins * (optionPools?.length ?? 5)
+        : (coins / (selectedPool.amount + coins)) * (totalScorePool + coins))
     : 0
   const scoreProfit = scoreReturn - coins
+  const estimatedReturn = isScore && !isOverUnder && !isSatAct ? scoreReturn : yesnoReturn
+  const estimatedProfit = isScore && !isOverUnder && !isSatAct ? scoreProfit : yesnoProfit
 
-  const estimatedReturn = isScore ? scoreReturn : yesnoReturn
-  const estimatedProfit = isScore ? scoreProfit : yesnoProfit
+  const isYesSide = side === 'YES' || (useYesNo && !['NO'].includes(side))
+  const sideColor = isYesSide ? 'sky' : 'orange'
 
   async function handleBet() {
-    if (!coins || coins < 1) {
-      toast.error('Enter a valid amount')
-      return
-    }
-    if (coins > userBalance) {
-      toast.error('Not enough coins')
-      return
-    }
-    if (!side) {
-      toast.error('Select an option')
-      return
-    }
-
+    if (!coins || coins < 1) { toast.error('Enter a valid amount'); return }
+    if (coins > userBalance) { toast.error('Not enough coins'); return }
+    if (!side) { toast.error('Select an option'); return }
     setLoading(true)
     try {
       const res = await fetch(`/api/markets/${market.id}/bet`, {
@@ -77,12 +68,9 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
         body: JSON.stringify({ side, amount: coins }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error || 'Bet failed')
-        return
-      }
+      if (!res.ok) { toast.error(data.error || 'Bet failed'); return }
       const sideLabel = side === 'YES' ? yesLabel : side === 'NO' ? noLabel : side
-      toast.success(`Bought ${isScore ? sideLabel : `${shares.toFixed(2)} ${sideLabel} shares`} for ${coins} coins`)
+      toast.success(`Bet ${coins} coins on ${sideLabel}`)
       setAmount('')
       onBetSuccess?.(data.newBalance)
       router.refresh()
@@ -95,130 +83,123 @@ export function BettingPanel({ market, userBalance, optionPools, onBetSuccess }:
 
   if (market.status !== 'open') {
     return (
-      <div className="rounded-lg border bg-muted p-4 text-center text-sm text-muted-foreground">
-        {market.status === 'resolved'
-          ? `Market resolved: ${market.outcome}`
-          : 'Betting is closed for this market'}
+      <div className="rounded-2xl border border-white/8 bg-card p-4 text-center text-sm text-muted-foreground">
+        {market.status === 'resolved' ? `Market resolved: ${market.outcome}` : 'Betting is closed'}
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <h3 className="font-semibold">Place a Bet</h3>
+    <div className="rounded-2xl border border-white/8 bg-card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">Trade</h3>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Coins size={12} />
+          <span>{userBalance.toLocaleString()} coins</span>
+        </div>
+      </div>
 
-      {isScore && optionPools ? (
-        <div className="grid grid-cols-1 gap-2">
+      {/* Side selector */}
+      {isScore && !isOverUnder && !isSatAct && optionPools ? (
+        <div className="space-y-1.5">
           {optionPools.map(opt => {
-            const total = totalScorePool
-            const pct = total === 0 ? Math.round(100 / optionPools.length) : Math.round((opt.amount / total) * 100)
+            const pct = totalScorePool === 0 ? Math.round(100 / optionPools.length) : Math.round((opt.amount / totalScorePool) * 100)
+            const active = side === opt.label
             return (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => setSide(opt.label)}
-                className={`flex justify-between items-center rounded-md border px-4 py-2.5 text-sm font-medium transition-colors ${
-                  side === opt.label
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'hover:bg-muted'
-                }`}
-              >
+              <button key={opt.label} onClick={() => setSide(opt.label)}
+                className={`w-full flex justify-between items-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                  active ? 'border-sky-500/50 bg-sky-500/15 text-sky-300' : 'border-white/8 hover:border-white/20 text-muted-foreground hover:text-foreground'
+                }`}>
                 <span>{opt.label}</span>
-                <span className="text-xs text-muted-foreground">{pct}%</span>
+                <span className="text-xs">{pct}%</span>
               </button>
             )
           })}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setSide('YES')}
-            className={`rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+          <button onClick={() => setSide('YES')}
+            className={`rounded-xl border py-3 text-sm font-bold transition-all ${
               side === 'YES'
-                ? 'border-green-600 bg-green-600 text-white'
-                : 'border-green-200 text-green-700 hover:bg-green-50'
-            }`}
-          >
-            <div>Buy {yesLabel}</div>
-            <div className="text-xs font-normal opacity-80">{Math.round((market.yes_price ?? 0.5) * 100)}% chance</div>
+                ? 'border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-500/25'
+                : 'border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
+            }`}>
+            <div>{yesLabel}</div>
+            <div className="text-xs font-normal opacity-75 mt-0.5">{Math.round((market.yes_price ?? 0.5) * 100)}%</div>
           </button>
-          <button
-            type="button"
-            onClick={() => setSide('NO')}
-            className={`rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+          <button onClick={() => setSide('NO')}
+            className={`rounded-xl border py-3 text-sm font-bold transition-all ${
               side === 'NO'
-                ? 'border-red-500 bg-red-500 text-white'
-                : 'border-red-200 text-red-600 hover:bg-red-50'
-            }`}
-          >
-            <div>Buy {noLabel}</div>
-            <div className="text-xs font-normal opacity-80">{Math.round((market.no_price ?? 0.5) * 100)}% chance</div>
+                ? 'border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25'
+                : 'border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
+            }`}>
+            <div>{noLabel}</div>
+            <div className="text-xs font-normal opacity-75 mt-0.5">{Math.round((market.no_price ?? 0.5) * 100)}%</div>
           </button>
         </div>
       )}
 
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Amount</label>
-          <span className="text-xs text-muted-foreground">Min bet: 1 coin</span>
+      {/* Amount presets */}
+      <div className="space-y-2">
+        <div className="flex gap-1.5">
+          {PRESETS.map(p => (
+            <button key={p} onClick={() => setAmount(String(Math.min(p, userBalance)))}
+              className={`flex-1 text-xs py-1.5 rounded-lg border transition-all font-medium ${
+                Number(amount) === p
+                  ? sideColor === 'sky'
+                    ? 'border-sky-500/50 bg-sky-500/15 text-sky-300'
+                    : 'border-orange-500/50 bg-orange-500/15 text-orange-300'
+                  : 'border-white/8 hover:border-white/20 text-muted-foreground hover:text-foreground'
+              }`}>
+              +{p}
+            </button>
+          ))}
+          <button onClick={() => setAmount(String(userBalance))}
+            className="flex-1 text-xs py-1.5 rounded-lg border border-white/8 hover:border-white/20 text-muted-foreground hover:text-foreground transition-all font-medium">
+            Max
+          </button>
         </div>
-        <div className="flex gap-2">
-          <Input
+        <div className="relative">
+          <input
             type="number"
             min={1}
             max={userBalance}
             value={amount}
             onChange={e => setAmount(e.target.value)}
-            placeholder="e.g. 100"
+            placeholder="Enter amount..."
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-sky-500/50 focus:bg-sky-500/5 transition-all placeholder:text-muted-foreground"
           />
-          <Button variant="outline" size="sm" onClick={() => setAmount(String(userBalance))}>
-            Max
-          </Button>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">coins</span>
         </div>
-        <p className="text-xs text-muted-foreground">Balance: {userBalance.toLocaleString()} coins</p>
       </div>
 
+      {/* Payout preview */}
       {coins > 0 && (
-        <div className="rounded-md bg-muted px-3 py-2.5 text-sm space-y-1">
-          {!isScore && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Shares</span>
-              <span className="font-medium">{shares.toFixed(2)}</span>
-            </div>
-          )}
-          {!isScore && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Avg price</span>
-              <span className="font-medium">{Math.round(priceCoins)}% avg odds</span>
-            </div>
-          )}
-          <div className="flex justify-between">
+        <div className="rounded-xl bg-white/4 border border-white/8 px-4 py-3 space-y-1.5 text-sm">
+          <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Potential return</span>
             <span className="font-medium">{estimatedReturn.toLocaleString()} coins</span>
           </div>
-          <div className="flex justify-between border-t pt-1 mt-1">
+          <div className="flex justify-between text-xs border-t border-white/8 pt-1.5">
             <span className="text-muted-foreground">Max profit</span>
-            <span className={`font-semibold ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {estimatedProfit >= 0 ? '+' : ''}{estimatedProfit.toLocaleString()} coins
+            <span className={`font-bold ${estimatedProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {estimatedProfit >= 0 ? '+' : ''}{estimatedProfit.toLocaleString()}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">(Changes as others bet)</p>
         </div>
       )}
 
-      <Button
-        className="w-full"
+      {/* Trade button */}
+      <button
         onClick={handleBet}
         disabled={loading || !coins || coins < 1 || coins > userBalance}
-      >
-        {loading
-          ? 'Placing bet...'
-          : isScore
-            ? `Buy ${side} for ${coins || 0} coins`
-            : `Buy ${shares > 0 ? shares.toFixed(2) : '0'} ${side === 'YES' ? yesLabel : noLabel} shares for ${coins || 0} coins`
-        }
-      </Button>
+        className={`w-full rounded-xl py-3.5 text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+          side === 'NO'
+            ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/20'
+            : 'bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/20'
+        }`}>
+        {loading ? 'Placing bet...' : `Buy ${side === 'YES' ? yesLabel : side === 'NO' ? noLabel : side} — ${coins || 0} coins`}
+      </button>
     </div>
   )
 }
