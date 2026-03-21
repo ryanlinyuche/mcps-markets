@@ -24,9 +24,16 @@ export async function GET(request: NextRequest) {
   let sql: string
   const args: (string | number | null)[] = []
 
-  if (tab === 'yours' && userId) {
+  // For "yours" fall back to the session user when no userId param is given
+  let resolvedUserId: number | null = userId ? Number(userId) : null
+  if (tab === 'yours' && !resolvedUserId) {
+    const session = await getSession()
+    resolvedUserId = session ? Number(session.sub) : null
+  }
+
+  if (tab === 'yours' && resolvedUserId) {
     sql = base + `WHERE m.creator_id = ? AND m.status NOT IN ('rejected') ORDER BY m.created_at DESC`
-    args.push(Number(userId))
+    args.push(resolvedUserId)
   } else if (tab === 'ongoing') {
     sql = base + `WHERE m.status = 'open' AND (m.closes_at IS NULL OR datetime(m.closes_at) > datetime('now')) ORDER BY m.created_at DESC`
   } else if (tab === 'closed') {

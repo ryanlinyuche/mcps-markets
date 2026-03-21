@@ -8,12 +8,13 @@ import { Loader2, PlusCircle } from 'lucide-react'
 import Link from 'next/link'
 
 const FILTERS = [
-  { id: 'ongoing',      label: 'All',          tab: 'ongoing' },
-  { id: 'sports',       label: 'Sports',       tab: 'ongoing', type: 'sports' },
-  { id: 'score',        label: 'Score',        tab: 'ongoing', type: 'score' },
-  { id: 'sat_act',      label: 'SAT / ACT',    tab: 'ongoing', type: 'sat_act' },
-  { id: 'closing-soon', label: 'Ending Soon',  tab: 'closed' },
-  { id: 'resolved',     label: 'Resolved',     tab: 'resolved' },
+  { id: 'ongoing',  label: 'All',           tab: 'ongoing' },
+  { id: 'sports',   label: 'Sports',        tab: 'ongoing', type: 'sports' },
+  { id: 'score',    label: 'Score',         tab: 'ongoing', type: 'score' },
+  { id: 'sat_act',  label: 'SAT / ACT',     tab: 'ongoing', type: 'sat_act' },
+  { id: 'closed',   label: 'Closed',        tab: 'closed' },
+  { id: 'resolved', label: 'Resolved',      tab: 'resolved' },
+  { id: 'yours',    label: 'Your Markets',  tab: 'yours' },
 ] as const
 
 type FilterId = typeof FILTERS[number]['id']
@@ -54,14 +55,14 @@ export default function AllMarketsPage() {
 
   useEffect(() => { loadMarkets(activeFilter) }, [activeFilter, loadMarkets])
 
-  const activeLabel = FILTERS.find(f => f.id === activeFilter)?.label ?? 'All'
   const emptyMessages: Record<FilterId, string> = {
-    'ongoing':      'No open markets right now — submit one!',
-    'sports':       'No sports markets open right now.',
-    'score':        'No score markets open right now.',
-    'sat_act':      'No SAT/ACT markets open right now.',
-    'closing-soon': 'No markets closing soon.',
-    'resolved':     'No resolved markets yet.',
+    'ongoing':  'No open markets right now — submit one!',
+    'sports':   'No sports markets open right now.',
+    'score':    'No score markets open right now.',
+    'sat_act':  'No SAT/ACT markets open right now.',
+    'closed':   'No markets awaiting resolution.',
+    'resolved': 'No resolved markets yet.',
+    'yours':    "You haven't created any markets yet.",
   }
 
   return (
