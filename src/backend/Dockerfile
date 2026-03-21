@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ ./src/
@@ -21,8 +21,8 @@ RUN addgroup -g 1001 -S nodejs && adduser -S backend -u 1001
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev --frozen-lockfile && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
