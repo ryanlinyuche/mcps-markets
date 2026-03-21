@@ -5,6 +5,7 @@ import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { LogoutButton } from './LogoutButton'
 import { TrendingUp } from 'lucide-react'
+import { SearchModal } from './SearchModal'
 
 export async function Navbar() {
   const session = await getSession()
@@ -51,6 +52,7 @@ export async function Navbar() {
                 Admin
               </Link>
             )}
+            <SearchModal />
             <CoinDisplay amount={balance} size="sm" />
             <LogoutButton />
           </div>
