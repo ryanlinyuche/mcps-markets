@@ -1,0 +1,13 @@
+apiVersion: v2
+name: mcps-backend
+description: StudentVUE proxy backend for MCPS Markets with Cloudflare Tunnel
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - mcps
+  - studentvue
+  - proxy
+  - backend
+maintainers:
+  - name: mcps-markets

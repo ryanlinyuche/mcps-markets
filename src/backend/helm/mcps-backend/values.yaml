@@ -1,0 +1,87 @@
+# ── Backend app ───────────────────────────────────────────────────────────────
+replicaCount: 2
+
+image:
+  repository: ghcr.io/your-org/mcps-backend
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP   # Internal only — no direct external access
+  port: 3000
+
+# ── Environment ───────────────────────────────────────────────────────────────
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  DEFAULT_DISTRICT_URL: "https://md-mcps-psv.edupoint.com"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX: "200"
+  VIEWSTATE_TTL: "21600000"
+  TASK_QUEUE_TTL: "1800000"
+
+# Secret env vars — set these with --set or a values override file
+secrets:
+  ENCRYPTION_KEY: ""        # Required
+  API_KEY: ""               # Optional
+  BAN_LIST: ""              # Optional
+
+# ── Cloudflare Tunnel ─────────────────────────────────────────────────────────
+cloudflared:
+  enabled: true
+  replicaCount: 2           # Run 2 connectors for HA
+  image:
+    repository: cloudflare/cloudflared
+    tag: latest
+    pullPolicy: Always
+  tunnelToken: ""           # Required: CLOUDFLARE_TUNNEL_TOKEN
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+# ── Autoscaling ───────────────────────────────────────────────────────────────
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# ── Pod disruption budget ─────────────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

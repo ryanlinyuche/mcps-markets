@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcps-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      API_KEY: ${API_KEY:-}
+      BAN_LIST: ${BAN_LIST:-}
+      DEFAULT_DISTRICT_URL: ${DEFAULT_DISTRICT_URL:-https://md-mcps-psv.edupoint.com}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    # No ports exposed directly — traffic only through Cloudflare Tunnel
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - backend-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: mcps-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - backend-net
+
+networks:
+  backend-net:
+    driver: bridge
