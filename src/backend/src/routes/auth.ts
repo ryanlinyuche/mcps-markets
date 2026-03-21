@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { login } from '../synergy.js'
-import { encryptPassword } from '../crypto.js'
+import { encryptPassword, decryptPassword } from '../crypto.js'
 import { validate } from '../middleware/validate.js'
 import { logger } from '../logger.js'
 
@@ -37,7 +37,7 @@ router.post('/refresh', validate(RefreshSchema), async (req, res) => {
 
     // Re-encrypt the plain password for the client to store
     const plainPassword = credentials.encrypted
-      ? (() => { const { decryptPassword } = require('../crypto.js'); return decryptPassword(credentials.password) })()
+      ? decryptPassword(credentials.password)
       : credentials.password
 
     res.json({

@@ -24,6 +24,12 @@ export function createApp() {
   // IP ban list
   app.use(ipBan)
 
+  // Health check — MUST be before apiKeyAuth so k8s liveness/readiness probes
+  // (which send no Authorization header) don't get 401 and mark the pod unhealthy
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: Math.floor(process.uptime()), userCount: getUserCount() })
+  })
+
   // Rate limiting
   if (config.rateLimitEnabled) {
     app.use(rateLimit({
@@ -37,11 +43,6 @@ export function createApp() {
 
   // Optional API key auth for all routes below
   app.use(apiKeyAuth)
-
-  // Health check (unauthenticated — needed for k8s probes)
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', uptime: Math.floor(process.uptime()), userCount: getUserCount() })
-  })
 
   // User count
   app.get('/userCount', (_req, res) => {
