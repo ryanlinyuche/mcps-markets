@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { Trophy } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,6 @@ export default async function LeaderboardPage() {
     args: [],
   })
   const users = res.rows as unknown as Pick<User, 'id' | 'name' | 'balance'>[]
-
   const medals = ['🥇', '🥈', '🥉']
 
   return (
@@ -40,15 +40,13 @@ export default async function LeaderboardPage() {
               {users.map((user, i) => {
                 const isMe = session && Number(session.sub) === user.id
                 return (
-                  <tr
-                    key={user.id}
-                    className={`border-t ${isMe ? 'bg-amber-50' : 'hover:bg-muted/50'}`}
-                  >
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {medals[i] || `#${i + 1}`}
-                    </td>
+                  <tr key={user.id} className={`border-t ${isMe ? 'bg-amber-50 dark:bg-amber-500/10' : 'hover:bg-muted/50'}`}>
+                    <td className="px-4 py-3 text-sm font-medium">{medals[i] || `#${i + 1}`}</td>
                     <td className="px-4 py-3 text-sm">
-                      {user.name}{isMe && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
+                      <Link href={`/profile/${user.id}`} className="font-medium hover:text-primary hover:underline transition-colors">
+                        {user.name}
+                      </Link>
+                      {isMe && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <CoinDisplay amount={user.balance} size="sm" />

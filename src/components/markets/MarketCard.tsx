@@ -110,13 +110,21 @@ export function MarketCard({ market }: MarketCardProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border">
-          <span>{total.toLocaleString()} coins</span>
-          {market.closes_at && (
-            <span>Closes {new Date(market.closes_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border gap-1">
+          <span className="shrink-0">{total.toLocaleString()} c</span>
+          {market.creator_name && (
+            <span
+              className="truncate hover:text-foreground hover:underline cursor-pointer transition-colors"
+              onClick={e => { e.preventDefault(); window.location.href = `/profile/${market.creator_id}` }}
+            >
+              {market.creator_name}
+            </span>
+          )}
+          {market.closes_at && !market.creator_name && (
+            <span className="shrink-0">Closes {new Date(market.closes_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
           )}
           {market.status === 'resolved' && market.outcome && (
-            <span className="text-purple-700 dark:text-purple-400 font-medium">→ {market.outcome}</span>
+            <span className="text-purple-700 dark:text-purple-400 font-medium shrink-0">→ {market.outcome}</span>
           )}
         </div>
       </div>

@@ -85,7 +85,9 @@ function ActivityRow({ item }: { item: ActivityItem }) {
       {/* Body */}
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug">
-          <span className="font-semibold text-foreground">{item.user_name}</span>
+          <Link href={`/profile/${item.user_id}`} className="font-semibold text-foreground hover:text-primary transition-colors">
+            {item.user_name}
+          </Link>
           {' '}
           {item.type === 'bet_placed' && item.side && (
             <>

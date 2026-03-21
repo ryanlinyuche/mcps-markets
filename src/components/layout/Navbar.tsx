@@ -5,55 +5,74 @@ import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { LogoutButton } from './LogoutButton'
 import { TrendingUp } from 'lucide-react'
-import { SearchModal } from './SearchModal'
+import { InlineSearch } from './InlineSearch'
+import { NotificationBell } from './NotificationBell'
 import { SideDrawer } from './SideDrawer'
 
 export async function Navbar() {
   const session = await getSession()
   let balance = 0
+  let userName = ''
 
   if (session) {
-    const res = await db.execute({ sql: 'SELECT balance FROM users WHERE id = ?', args: [Number(session.sub)] })
-    balance = (res.rows[0] as unknown as Pick<User, 'balance'> | undefined)?.balance ?? 0
+    const res = await db.execute({
+      sql: 'SELECT balance, name FROM users WHERE id = ?',
+      args: [Number(session.sub)],
+    })
+    const row = res.rows[0] as unknown as Pick<User, 'balance' | 'name'> | undefined
+    balance = row?.balance ?? 0
+    userName = row?.name ?? session.name ?? ''
   }
+
+  const initial = userName.charAt(0).toUpperCase() || '?'
 
   return (
     <nav className="border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+
         {/* Logo */}
-        <Link href={session ? '/markets/ongoing' : '/'} className="flex items-center gap-2 font-bold text-lg shrink-0">
-          <TrendingUp size={22} className="text-sky-400" />
-          <span>MCPS Markets</span>
+        <Link
+          href={session ? '/markets/ongoing' : '/'}
+          className="flex items-center gap-2 font-bold text-base shrink-0"
+        >
+          <TrendingUp size={20} className="text-sky-400" />
+          <span className="hidden sm:inline">MCPS Markets</span>
         </Link>
 
         {session ? (
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Primary nav links */}
-            <Link href="/markets/ongoing" className="text-sm text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors hidden md:block">
-              Markets
-            </Link>
-            <Link href="/schools" className="text-sm text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors hidden md:block">
-              Schools
-            </Link>
-            <Link href="/markets/sports" className="text-sm text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors hidden md:block">
-              Sports
-            </Link>
-            <Link href="/rules" className="text-sm text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors hidden lg:block">
-              Rules
-            </Link>
+          <>
+            {/* Center: inline search */}
+            <div className="flex-1 flex justify-center px-2">
+              <InlineSearch />
+            </div>
 
-            {/* Always-visible actions */}
-            <SearchModal />
-            <CoinDisplay amount={balance} size="sm" />
-            <LogoutButton />
+            {/* Right: coins | bell | avatar | hamburger */}
+            <div className="flex items-center gap-1 shrink-0">
+              <CoinDisplay amount={balance} size="sm" />
+              <NotificationBell />
 
-            {/* Hamburger — side drawer with Winners, Leaderboard, Activity, Profile, Admin, Theme */}
-            <SideDrawer isAdmin={session.isAdmin} />
-          </div>
+              {/* Profile avatar → own profile */}
+              <Link
+                href="/profile"
+                className="w-8 h-8 rounded-full bg-primary/15 hover:bg-primary/25 flex items-center justify-center text-sm font-bold text-primary transition-colors"
+                aria-label="My profile"
+                title={userName}
+              >
+                {initial}
+              </Link>
+
+              <LogoutButton />
+
+              {/* Hamburger side drawer: Winners, Leaderboard, Activity, Admin, Theme */}
+              <SideDrawer isAdmin={session.isAdmin} />
+            </div>
+          </>
         ) : (
-          <Link href="/login" className="text-sm font-medium hover:underline">
-            Login
-          </Link>
+          <div className="flex-1 flex justify-end">
+            <Link href="/login" className="text-sm font-medium hover:underline">
+              Login
+            </Link>
+          </div>
         )}
       </div>
     </nav>

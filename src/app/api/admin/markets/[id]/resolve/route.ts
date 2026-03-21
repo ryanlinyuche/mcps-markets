@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/session'
 import { resolveMarket, resolveScoreMarket, resolveMarketNA } from '@/lib/market-math'
+import { notifyMarketResolved } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -18,27 +19,35 @@ export async function POST(
   const { outcome, resolution_notes } = await request.json()
   const resolvedBy = Number(session.sub)
   const notes: string | null = resolution_notes?.trim() || null
+  const marketId = Number(id)
 
-  const marketRes = await db.execute({ sql: 'SELECT market_type FROM markets WHERE id = ?', args: [Number(id)] })
-  const market = marketRes.rows[0] as unknown as { market_type: string } | undefined
+  const marketRes = await db.execute({
+    sql: 'SELECT title, market_type FROM markets WHERE id = ?',
+    args: [marketId],
+  })
+  const market = marketRes.rows[0] as unknown as { title: string; market_type: string } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
 
   try {
     if (outcome === 'N/A') {
-      await resolveMarketNA(Number(id), resolvedBy, notes)
+      await resolveMarketNA(marketId, resolvedBy, notes)
     } else if (market.market_type === 'score' || market.market_type === 'personal_score') {
       if (!outcome || typeof outcome !== 'string') {
         return NextResponse.json({ error: 'Outcome is required' }, { status: 400 })
       }
-      await resolveScoreMarket(Number(id), outcome, resolvedBy, notes)
+      await resolveScoreMarket(marketId, outcome, resolvedBy, notes)
     } else {
       if (!['YES', 'NO'].includes(outcome)) {
         return NextResponse.json({ error: 'Outcome must be YES or NO' }, { status: 400 })
       }
-      await resolveMarket(Number(id), outcome as 'YES' | 'NO', resolvedBy, notes)
+      await resolveMarket(marketId, outcome as 'YES' | 'NO', resolvedBy, notes)
     }
+
+    // Fire-and-forget notifications (non-critical)
+    notifyMarketResolved(marketId, market.title, outcome).catch(() => {})
+
     return NextResponse.json({ success: true })
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Failed to resolve market'

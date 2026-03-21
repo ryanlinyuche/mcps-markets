@@ -101,6 +101,16 @@ export async function register() {
       `CREATE INDEX IF NOT EXISTS idx_positions_market ON positions(market_id)`,
       `CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_market_history ON market_history(market_id, recorded_at)`,
+      `CREATE TABLE IF NOT EXISTS notifications (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        type       TEXT NOT NULL,
+        market_id  INTEGER REFERENCES markets(id),
+        message    TEXT NOT NULL,
+        read       INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read)`,
     ]
 
     for (const sql of tables) {

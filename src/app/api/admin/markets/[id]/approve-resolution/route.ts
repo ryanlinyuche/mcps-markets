@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/session'
 import { resolveMarket, resolveScoreMarket, resolveMarketNA } from '@/lib/market-math'
+import { notifyMarketResolved } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -22,10 +23,10 @@ export async function POST(
   const notes: string | null = resolution_notes?.trim() || null
 
   const marketRes = await db.execute({
-    sql: 'SELECT market_type, status, pending_outcome FROM markets WHERE id = ?',
+    sql: 'SELECT title, market_type, status, pending_outcome FROM markets WHERE id = ?',
     args: [marketId],
   })
-  const market = marketRes.rows[0] as unknown as { market_type: string; status: string; pending_outcome: string | null } | undefined
+  const market = marketRes.rows[0] as unknown as { title: string; market_type: string; status: string; pending_outcome: string | null } | undefined
   if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   if (market.status !== 'pending_resolution') return NextResponse.json({ error: 'Market is not pending resolution' }, { status: 400 })
   if (!market.pending_outcome) return NextResponse.json({ error: 'No pending outcome to approve' }, { status: 400 })
@@ -48,6 +49,9 @@ export async function POST(
       sql: `UPDATE markets SET pending_outcome = NULL, resolution_requested_by = NULL WHERE id = ?`,
       args: [marketId],
     })
+
+    // Fire-and-forget notifications (non-critical)
+    notifyMarketResolved(marketId, market.title, outcome).catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch (error) {
