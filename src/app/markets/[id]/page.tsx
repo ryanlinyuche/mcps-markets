@@ -93,13 +93,17 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
     return { ...m, yes_price: total === 0 ? 0.5 : m.yes_pool / total, no_price: total === 0 ? 0.5 : m.no_pool / total }
   })
 
-  const statusBadge = {
-    open: 'bg-green-100 dark:bg-sky-500/15 text-green-700 dark:text-sky-400 border border-green-200 dark:border-sky-500/30',
-    pending_approval: 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-500/30',
-    pending_resolution: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30',
-    resolved: 'bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30',
-    rejected: 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30',
-  }[market.status] || 'bg-muted text-muted-foreground'
+  const isPastClose = market.status === 'open' && !!market.closes_at && new Date(market.closes_at) <= new Date()
+  const displayStatus = isPastClose ? 'closed' : market.status
+  const statusBadge = isPastClose
+    ? 'bg-slate-100 dark:bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-500/30'
+    : ({
+        open: 'bg-green-100 dark:bg-sky-500/15 text-green-700 dark:text-sky-400 border border-green-200 dark:border-sky-500/30',
+        pending_approval: 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-500/30',
+        pending_resolution: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30',
+        resolved: 'bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30',
+        rejected: 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30',
+      }[market.status] || 'bg-muted text-muted-foreground')
 
   return (
     <div className="space-y-5">
@@ -110,7 +114,10 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         <div className="flex items-start gap-3 flex-wrap">
           <h1 className="text-2xl font-bold flex-1 leading-tight">{market.title}</h1>
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusBadge}`}>
-            {market.status === 'pending_approval' ? 'Pending' : market.status === 'pending_resolution' ? 'Resolving' : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
+            {displayStatus === 'closed' ? 'Closed'
+              : market.status === 'pending_approval' ? 'Pending'
+              : market.status === 'pending_resolution' ? 'Resolving'
+              : market.status.charAt(0).toUpperCase() + market.status.slice(1)}
           </span>
         </div>
         <div className="flex flex-wrap gap-2 mt-2">
