@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Market, OptionPool } from '@/types'
 import { toast } from 'sonner'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ImagePlus, X } from 'lucide-react'
 import Link from 'next/link'
 
 type MarketWithExtras = Market & {
@@ -22,18 +22,44 @@ export default function ResolvePage() {
   const [market, setMarket] = useState<MarketWithExtras | null>(null)
   const [loading, setLoading] = useState(false)
   const [notes, setNotes] = useState('')
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [proofPreview, setProofPreview] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch(`/api/markets/${id}`).then(r => r.json()).then(setMarket)
   }, [id])
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Only image files are supported'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
+    setProofFile(file)
+    setProofPreview(URL.createObjectURL(file))
+  }
+
+  function clearProof() {
+    setProofFile(null)
+    setProofPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   async function handleResolve(outcome: string) {
+    if (!proofFile && outcome !== 'N/A') {
+      toast.error('Upload proof image before resolving')
+      return
+    }
     setLoading(true)
     try {
+      const formData = new FormData()
+      formData.append('outcome', outcome)
+      if (notes.trim()) formData.append('resolution_notes', notes.trim())
+      if (proofFile) formData.append('file', proofFile)
+
       const res = await fetch(`/api/admin/markets/${id}/resolve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome, resolution_notes: notes }),
+        body: formData,
       })
       if (res.ok) {
         toast.success(`Market resolved: ${outcome}`)
@@ -95,6 +121,7 @@ export default function ResolvePage() {
   const total = isScore
     ? (market.option_pools?.reduce((s, o) => s + o.amount, 0) ?? 0)
     : market.yes_pool + market.no_pool
+  const isPendingResolution = market.status === 'pending_resolution'
 
   return (
     <div className="max-w-xl space-y-6">
@@ -119,8 +146,8 @@ export default function ResolvePage() {
         </div>
       </div>
 
-      {/* Creator resolution request */}
-      {market.status === 'pending_resolution' && market.pending_outcome && (
+      {/* Creator resolution request — admin just approves */}
+      {isPendingResolution && market.pending_outcome && (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 space-y-4">
           <div>
             <p className="text-sm font-semibold text-yellow-900">Creator Resolution Request</p>
@@ -179,6 +206,7 @@ export default function ResolvePage() {
         </div>
       )}
 
+      {/* Pool breakdown */}
       {isScore && market.option_pools ? (
         <div className="rounded-lg border divide-y">
           {market.option_pools.map(opt => (
@@ -214,18 +242,59 @@ export default function ResolvePage() {
         </div>
       )}
 
-      {/* Resolution notes (for manual resolution only) */}
-      {market.status !== 'pending_resolution' && (
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Resolution Notes (optional)</label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="e.g. Class average was 78.4, confirmed via Canvas gradebook on 3/15"
-            className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-            maxLength={500}
-          />
-          <p className="text-xs text-muted-foreground">Explain your resolution decision. This will be visible to all users.</p>
+      {/* Manual resolution — proof upload + notes */}
+      {!isPendingResolution && (
+        <div className="space-y-4">
+          {/* Proof upload */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Proof Image <span className="text-destructive">*</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1">(required for YES/NO, optional for N/A)</span>
+            </label>
+
+            {proofPreview ? (
+              <div className="relative rounded-lg border border-border overflow-hidden">
+                <img src={proofPreview} alt="Proof preview" className="w-full max-h-56 object-contain bg-muted" />
+                <button
+                  onClick={clearProof}
+                  className="absolute top-2 right-2 rounded-full bg-black/60 p-1 hover:bg-black/80 transition-colors"
+                >
+                  <X size={14} className="text-white" />
+                </button>
+                <p className="text-xs text-muted-foreground px-3 py-2 border-t border-border">{proofFile?.name}</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex flex-col items-center gap-2 w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors p-6 text-sm text-muted-foreground"
+              >
+                <ImagePlus size={22} className="text-muted-foreground" />
+                <span>Click to upload screenshot or image proof</span>
+                <span className="text-xs">PNG, JPG, GIF · max 5MB</span>
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Resolution Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. Class average was 78.4, confirmed via Canvas gradebook on 3/15"
+              className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              maxLength={500}
+            />
+            <p className="text-xs text-muted-foreground">Explain your resolution. Visible to all users.</p>
+          </div>
         </div>
       )}
 
@@ -233,54 +302,58 @@ export default function ResolvePage() {
         Winners will receive a proportional payout from the total pool. This action cannot be undone.
       </p>
 
-      {isScore && market.option_pools ? (
-        <div className="grid grid-cols-1 gap-3">
-          {market.option_pools.map(opt => (
+      {!isPendingResolution && (
+        <>
+          {isScore && market.option_pools ? (
+            <div className="grid grid-cols-1 gap-3">
+              {market.option_pools.map(opt => (
+                <Button
+                  key={opt.label}
+                  variant="outline"
+                  className="h-12 text-base justify-start px-4"
+                  onClick={() => handleResolve(opt.label)}
+                  disabled={loading}
+                >
+                  Resolve: {opt.label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                className="bg-green-600 hover:bg-green-700 h-16 text-lg"
+                onClick={() => handleResolve('YES')}
+                disabled={loading}
+              >
+                Resolve YES
+              </Button>
+              <Button
+                className="bg-red-500 hover:bg-red-600 h-16 text-lg"
+                onClick={() => handleResolve('NO')}
+                disabled={loading}
+              >
+                Resolve NO
+              </Button>
+            </div>
+          )}
+
+          {/* N/A Cancel */}
+          <div className="border-t pt-4">
+            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+              <AlertTriangle size={12} />
+              If the event was cancelled or the outcome can&apos;t be determined:
+            </p>
             <Button
-              key={opt.label}
               variant="outline"
-              className="h-12 text-base justify-start px-4"
-              onClick={() => handleResolve(opt.label)}
+              className="w-full border-red-200 text-red-600 hover:bg-red-50"
+              onClick={() => handleResolve('N/A')}
               disabled={loading}
             >
-              Resolve: {opt.label}
+              Resolve N/A &mdash; Refund All Bets
             </Button>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            className="bg-green-600 hover:bg-green-700 h-16 text-lg"
-            onClick={() => handleResolve('YES')}
-            disabled={loading}
-          >
-            Resolve YES
-          </Button>
-          <Button
-            className="bg-red-500 hover:bg-red-600 h-16 text-lg"
-            onClick={() => handleResolve('NO')}
-            disabled={loading}
-          >
-            Resolve NO
-          </Button>
-        </div>
+          </div>
+        </>
       )}
-
-      {/* N/A Cancel */}
-      <div className="border-t pt-4">
-        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-          <AlertTriangle size={12} />
-          If the event was cancelled or the outcome can&apos;t be determined:
-        </p>
-        <Button
-          variant="outline"
-          className="w-full border-red-200 text-red-600 hover:bg-red-50"
-          onClick={() => handleResolve('N/A')}
-          disabled={loading}
-        >
-          Resolve N/A &mdash; Refund All Bets
-        </Button>
-      </div>
     </div>
   )
 }
