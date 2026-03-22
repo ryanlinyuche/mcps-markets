@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sql: 'INSERT INTO comments (market_id, user_id, parent_id, content) VALUES (?, ?, ?, ?)',
       args: [marketId, userId, parent_id ?? null, content.trim()],
     })
-    return NextResponse.json({ id: insertRes.lastInsertRowid, success: true })
+    return NextResponse.json({ id: Number(insertRes.lastInsertRowid), success: true })
   } catch (err) {
     console.error('[comments POST]', err)
     return NextResponse.json({ error: 'Failed to post comment' }, { status: 500 })
