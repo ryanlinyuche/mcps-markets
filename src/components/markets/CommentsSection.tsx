@@ -154,7 +154,7 @@ export function CommentsSection({ marketId, isAdmin, isLoggedIn, commentsRestric
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newContent.trim() }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setNewContent('')
         fetchComments()
@@ -162,7 +162,7 @@ export function CommentsSection({ marketId, isAdmin, isLoggedIn, commentsRestric
         toast.error(data.error || 'Failed to post comment')
       }
     } catch {
-      toast.error('Something went wrong')
+      toast.error('Failed to post comment')
     } finally {
       setSubmitting(false)
     }
@@ -178,7 +178,7 @@ export function CommentsSection({ marketId, isAdmin, isLoggedIn, commentsRestric
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: replyContent.trim(), parent_id: replyTo.id }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setReplyContent('')
         setReplyTo(null)
@@ -187,7 +187,7 @@ export function CommentsSection({ marketId, isAdmin, isLoggedIn, commentsRestric
         toast.error(data.error || 'Failed to post reply')
       }
     } catch {
-      toast.error('Something went wrong')
+      toast.error('Failed to post reply')
     } finally {
       setReplySubmitting(false)
     }
