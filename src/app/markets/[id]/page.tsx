@@ -78,6 +78,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
     user_flagged: userFlagged,
     resolved_by_name: resolvedByName,
     subject_name: market.subject_name ?? null,
+    comments_restricted: market.comments_restricted ?? null,
   }
 
   const similarRes = await db.execute({
@@ -149,6 +150,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
         isLoggedIn={!!session}
         isCreator={!!session && Number(session.sub) === market.creator_id}
         isAdmin={!!session?.isAdmin}
+        commentsRestricted={market.comments_restricted === 1}
       />
     </div>
   )

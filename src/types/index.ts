@@ -14,6 +14,7 @@ export interface User {
   is_admin: number
   created_at: string
   rules_accepted_at?: string | null
+  comments_banned?: number | null
 }
 
 export interface OptionPool {
@@ -60,6 +61,7 @@ export interface Market {
   team_b?: string | null
   score_subtype?: 'letter_grade' | 'overunder' | null
   score_threshold?: number | null
+  comments_restricted?: number | null
 }
 
 export interface Position {

@@ -3,41 +3,59 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MarketCard } from '@/components/markets/MarketCard'
+import { FeaturedCarousel } from '@/components/markets/FeaturedCarousel'
 import { Market } from '@/types'
 import { Loader2, PlusCircle } from 'lucide-react'
 import Link from 'next/link'
 
-const FILTERS = [
-  { id: 'ongoing',  label: 'All',           tab: 'ongoing' },
-  { id: 'sports',   label: 'Sports',        tab: 'ongoing', type: 'sports' },
-  { id: 'score',    label: 'Score',         tab: 'ongoing', type: 'score' },
-  { id: 'sat_act',  label: 'SAT / ACT',     tab: 'ongoing', type: 'sat_act' },
-  { id: 'closed',   label: 'Closed',        tab: 'closed' },
-  { id: 'resolved', label: 'Resolved',      tab: 'resolved' },
-  { id: 'yours',    label: 'Your Markets',  tab: 'yours' },
-] as const
+interface FilterDef {
+  id: string
+  label: string
+  tab: string
+  type?: string
+  filter?: string
+}
 
-type FilterId = typeof FILTERS[number]['id']
+const FILTERS: FilterDef[] = [
+  { id: 'ongoing',      label: 'All',           tab: 'ongoing' },
+  { id: 'ending_soon',  label: '🔥 Ending Soon', tab: 'ongoing', filter: 'ending_soon' },
+  { id: 'sports',       label: 'Sports',         tab: 'ongoing', type: 'sports' },
+  { id: 'score',        label: 'Score',          tab: 'ongoing', type: 'score' },
+  { id: 'sat_act',      label: 'SAT / ACT',      tab: 'ongoing', type: 'sat_act' },
+  { id: 'closed',       label: 'Closed',         tab: 'closed' },
+  { id: 'resolved',     label: 'Resolved',       tab: 'resolved' },
+  { id: 'yours',        label: 'Your Markets',   tab: 'yours' },
+]
 
 export default function AllMarketsPage() {
   const searchParams = useSearchParams()
   const typeParam = searchParams.get('type')
-  const initialFilter: FilterId = (typeParam && FILTERS.find(f => 'type' in f && f.type === typeParam)?.id) || 'ongoing'
+  const filterParam = searchParams.get('filter')
 
-  const [activeFilter, setActiveFilter] = useState<FilterId>(initialFilter)
+  const initialFilter: string = (() => {
+    if (filterParam === 'ending_soon') return 'ending_soon'
+    if (typeParam) {
+      const found = FILTERS.find(f => f.type === typeParam)
+      if (found) return found.id
+    }
+    return 'ongoing'
+  })()
+
+  const [activeFilter, setActiveFilter] = useState<string>(initialFilter)
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadMarkets = useCallback(async (filterId: FilterId) => {
+  const loadMarkets = useCallback(async (filterId: string) => {
     setLoading(true)
     const filter = FILTERS.find(f => f.id === filterId)!
-    let url = `/api/markets?tab=${filter.tab}`
+    const url = `/api/markets?tab=${filter.tab}`
     try {
       const res = await fetch(url)
       if (!res.ok) throw new Error()
       let data: Market[] = await res.json()
+
       // Client-side type filter for score/sports/sat_act
-      if ('type' in filter && filter.type) {
+      if (filter.type) {
         const t = filter.type
         if (t === 'score') {
           data = data.filter(m => m.market_type === 'score' || m.market_type === 'personal_score')
@@ -45,6 +63,19 @@ export default function AllMarketsPage() {
           data = data.filter(m => m.market_type === t)
         }
       }
+
+      // Client-side filter for ending_soon
+      if (filter.filter === 'ending_soon') {
+        const now = new Date()
+        const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+        data = data.filter(m =>
+          m.closes_at !== null &&
+          new Date(m.closes_at) > now &&
+          new Date(m.closes_at) <= threeDaysFromNow
+        )
+        data.sort((a, b) => new Date(a.closes_at!).getTime() - new Date(b.closes_at!).getTime())
+      }
+
       setMarkets(data)
     } catch {
       setMarkets([])
@@ -55,18 +86,21 @@ export default function AllMarketsPage() {
 
   useEffect(() => { loadMarkets(activeFilter) }, [activeFilter, loadMarkets])
 
-  const emptyMessages: Record<FilterId, string> = {
-    'ongoing':  'No open markets right now — submit one!',
-    'sports':   'No sports markets open right now.',
-    'score':    'No score markets open right now.',
-    'sat_act':  'No SAT/ACT markets open right now.',
-    'closed':   'No markets awaiting resolution.',
-    'resolved': 'No resolved markets yet.',
-    'yours':    "You haven't created any markets yet.",
+  const emptyMessages: Record<string, string> = {
+    'ongoing':      'No open markets right now — submit one!',
+    'ending_soon':  'No markets closing in the next 3 days.',
+    'sports':       'No sports markets open right now.',
+    'score':        'No score markets open right now.',
+    'sat_act':      'No SAT/ACT markets open right now.',
+    'closed':       'No markets awaiting resolution.',
+    'resolved':     'No resolved markets yet.',
+    'yours':        "You haven't created any markets yet.",
   }
 
   return (
     <div className="space-y-5">
+      <FeaturedCarousel />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -111,7 +145,7 @@ export default function AllMarketsPage() {
       ) : markets.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
           <p className="text-4xl mb-3">📊</p>
-          <p className="font-medium">{emptyMessages[activeFilter]}</p>
+          <p className="font-medium">{emptyMessages[activeFilter] ?? 'No markets found.'}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

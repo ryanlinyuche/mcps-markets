@@ -13,21 +13,25 @@ export default function AdminMarketsPage() {
   const [pending, setPending] = useState<(Market & { creator_name: string })[]>([])
   const [open, setOpen] = useState<(Market & { creator_name: string })[]>([])
   const [pendingResolution, setPendingResolution] = useState<(Market & { creator_name: string })[]>([])
+  const [featured, setFeatured] = useState<(Market & { creator_name: string })[]>([])
   const [loading, setLoading] = useState(true)
 
   async function fetchMarkets() {
     try {
-      const [pendingRes, openRes, pendingResolutionRes] = await Promise.all([
+      const [pendingRes, openRes, pendingResolutionRes, featuredRes] = await Promise.all([
         fetch('/api/admin/markets?status=pending_approval'),
         fetch('/api/admin/markets?status=open'),
         fetch('/api/admin/markets?status=pending_resolution'),
+        fetch('/api/markets/featured'),
       ])
       const pendingData = await pendingRes.json()
       const openData = await openRes.json()
       const pendingResolutionData = await pendingResolutionRes.json()
+      const featuredData = await featuredRes.json()
       setPending(Array.isArray(pendingData) ? pendingData : [])
       setOpen(Array.isArray(openData) ? openData : [])
       setPendingResolution(Array.isArray(pendingResolutionData) ? pendingResolutionData : [])
+      setFeatured(Array.isArray(featuredData) ? featuredData : [])
     } catch (e) {
       console.error('Failed to fetch markets:', e)
       toast.error('Failed to load markets')
@@ -52,7 +56,30 @@ export default function AdminMarketsPage() {
     }
   }
 
+  async function handleFeature(marketId: number) {
+    const res = await fetch(`/api/admin/markets/${marketId}/feature`, { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      toast.success('Market featured')
+      fetchMarkets()
+    } else {
+      toast.error(data.error || 'Failed to feature market')
+    }
+  }
+
+  async function handleUnfeature(marketId: number) {
+    const res = await fetch(`/api/admin/markets/${marketId}/feature`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Market removed from featured')
+      fetchMarkets()
+    } else {
+      toast.error('Failed to unfeature market')
+    }
+  }
+
   if (loading) return <p className="text-muted-foreground">Loading...</p>
+
+  const featuredIds = new Set(featured.map(f => f.id))
 
   return (
     <div className="space-y-6">
@@ -68,6 +95,7 @@ export default function AdminMarketsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="open">Open ({open.length})</TabsTrigger>
+          <TabsTrigger value="featured">⭐ Featured ({featured.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="mt-4 space-y-3">
@@ -131,19 +159,75 @@ export default function AdminMarketsPage() {
                         🚩 {market.flag_count}
                       </span>
                     )}
+                    {featuredIds.has(market.id) && (
+                      <span className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-0.5 shrink-0">
+                        ⭐ Featured
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins · YES {Math.round((market.yes_price ?? 0.5) * 100)}% / NO {Math.round((market.no_price ?? 0.5) * 100)}%
                   </p>
                 </div>
-                <Link
-                  href={`/admin/resolve/${market.id}`}
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors shrink-0"
-                >
-                  Resolve
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  {featuredIds.has(market.id) ? (
+                    <button
+                      onClick={() => handleUnfeature(market.id)}
+                      className="inline-flex items-center justify-center rounded-md border border-yellow-300 bg-yellow-50 px-3 py-1 text-sm font-medium text-yellow-700 hover:bg-yellow-100 transition-colors"
+                    >
+                      ★ Unfeature
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleFeature(market.id)}
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      ☆ Feature
+                    </button>
+                  )}
+                  <Link
+                    href={`/admin/resolve/${market.id}`}
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    Resolve
+                  </Link>
+                </div>
               </div>
             ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="featured" className="mt-4 space-y-3">
+          {featured.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-6">No featured markets. Go to the Open tab to feature markets.</p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">Featured markets appear in the carousel on the markets page. Max 5.</p>
+              {featured.map(market => (
+                <div key={market.id} className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/30 p-4 flex justify-between items-center gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold truncate">{market.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      By {market.creator_name} · Pool: {(market.yes_pool + market.no_pool).toLocaleString()} coins
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={`/markets/${market.id}`}
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      View
+                    </Link>
+                    <button
+                      onClick={() => handleUnfeature(market.id)}
+                      className="inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </TabsContent>
       </Tabs>

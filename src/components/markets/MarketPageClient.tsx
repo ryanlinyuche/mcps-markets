@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Market, OptionPool, Position } from '@/types'
 import { BettingPanel } from './BettingPanel'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
-import { Info, ImagePlus, ShieldCheck, Send, Clock, TrendingUp, Pencil, Trash2 } from 'lucide-react'
+import { Info, ImagePlus, ShieldCheck, Send, Clock, TrendingUp, Pencil, Trash2, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { CommentsSection } from './CommentsSection'
 
 // ─── Theme hook ───────────────────────────────────────────────────────────────
 function useIsDark() {
@@ -437,12 +438,13 @@ interface Props {
   isLoggedIn: boolean
   isCreator?: boolean
   isAdmin?: boolean
+  commentsRestricted?: boolean
 }
 
 export function MarketPageClient({
   initialMarket, userBalance, initialOptionPools, initialHistory = [],
   userPositions = [], similarMarkets = [],
-  isLoggedIn, isCreator = false, isAdmin = false,
+  isLoggedIn, isCreator = false, isAdmin = false, commentsRestricted = false,
 }: Props) {
   const router = useRouter()
   const [market, setMarket] = useState(initialMarket)
@@ -460,6 +462,10 @@ export function MarketPageClient({
 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showProofUpload, setShowProofUpload] = useState(false)
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [uploadingProof, setUploadingProof] = useState(false)
+  const proofInputRef = useRef<HTMLInputElement>(null)
 
   async function handleDelete() {
     setDeleting(true)
@@ -510,6 +516,29 @@ export function MarketPageClient({
     setBalance(newBalance)
     refetch()
     router.refresh()
+  }
+
+  async function handleUpdateProof() {
+    if (!proofFile) return
+    setUploadingProof(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', proofFile)
+      const res = await fetch(`/api/admin/markets/${initialMarket.id}/update-proof`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Proof updated')
+        setShowProofUpload(false)
+        setProofFile(null)
+        refetch()
+      } else {
+        toast.error(data.error || 'Failed to update proof')
+      }
+    } catch {
+      toast.error('Something went wrong')
+    } finally {
+      setUploadingProof(false)
+    }
   }
 
   const yesPrice = market.yes_price ?? (market.yes_pool / (market.yes_pool + market.no_pool) || 0.5)
@@ -590,6 +619,14 @@ export function MarketPageClient({
             onResolutionRequested={refetch}
           />
         )}
+
+        {/* Comments */}
+        <CommentsSection
+          marketId={initialMarket.id}
+          isAdmin={isAdmin}
+          isLoggedIn={isLoggedIn}
+          commentsRestricted={commentsRestricted || market.comments_restricted === 1}
+        />
       </div>
 
       {/* ── Right column (sticky) ── */}
@@ -676,6 +713,48 @@ export function MarketPageClient({
                     className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50"
                   >
                     {deleting ? 'Deleting…' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Admin: Update Proof (resolved markets) */}
+        {isAdmin && market.status === 'resolved' && (
+          <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Admin Actions</p>
+            <input ref={proofInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => setProofFile(e.target.files?.[0] ?? null)} />
+            {!showProofUpload ? (
+              <button
+                onClick={() => setShowProofUpload(true)}
+                className="flex items-center gap-2 w-full rounded-xl border border-border bg-muted/50 hover:bg-muted px-3 py-2.5 text-sm font-medium transition-colors"
+              >
+                <UploadCloud size={14} /> Update Resolution Proof
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <button onClick={() => proofInputRef.current?.click()}
+                  className={`flex items-center gap-2 w-full rounded-xl border text-sm px-3 py-2.5 transition-all ${
+                    proofFile ? 'border-green-500 text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-500/10' : 'border-dashed border-border hover:bg-muted text-muted-foreground'
+                  }`}>
+                  <ImagePlus size={14} />
+                  {proofFile ? proofFile.name : 'Choose image (max 5MB)'}
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowProofUpload(false); setProofFile(null) }}
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUpdateProof}
+                    disabled={!proofFile || uploadingProof}
+                    className="flex-1 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 hover:bg-primary/90"
+                  >
+                    {uploadingProof ? 'Uploading…' : 'Upload Proof'}
                   </button>
                 </div>
               </div>

@@ -7,7 +7,7 @@ import { Search, Sparkles, Clock, CheckCircle2 } from 'lucide-react'
 
 const BROWSE = [
   { label: 'New',         icon: <Sparkles size={13} />,     href: '/markets/ongoing' },
-  { label: 'Ending Soon', icon: <Clock size={13} />,         href: '/markets/closed' },
+  { label: 'Ending Soon', icon: <Clock size={13} />,         href: '/markets/ongoing?filter=ending_soon' },
   { label: 'Resolved',    icon: <CheckCircle2 size={13} />,  href: '/markets/resolved' },
 ]
 

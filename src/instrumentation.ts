@@ -111,6 +111,25 @@ export async function register() {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`,
       `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read)`,
+      `CREATE TABLE IF NOT EXISTS comments (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        market_id  INTEGER NOT NULL REFERENCES markets(id),
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        parent_id  INTEGER REFERENCES comments(id),
+        content    TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS comment_likes (
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        comment_id INTEGER NOT NULL REFERENCES comments(id),
+        PRIMARY KEY (user_id, comment_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS featured_markets (
+        market_id  INTEGER PRIMARY KEY REFERENCES markets(id),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        added_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_comments_market ON comments(market_id)`,
     ]
 
     for (const sql of tables) {
@@ -125,6 +144,8 @@ export async function register() {
       `ALTER TABLE users ADD COLUMN rules_accepted_at TEXT`,
       `ALTER TABLE markets ADD COLUMN score_subtype TEXT`,
       `ALTER TABLE markets ADD COLUMN score_threshold INTEGER`,
+      `ALTER TABLE users ADD COLUMN comments_banned INTEGER DEFAULT 0`,
+      `ALTER TABLE markets ADD COLUMN comments_restricted INTEGER DEFAULT 0`,
     ]
     for (const sql of alterStatements) {
       try { await db.execute(sql) } catch { /* column already exists */ }
