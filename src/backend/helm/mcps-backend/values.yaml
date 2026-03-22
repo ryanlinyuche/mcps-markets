@@ -30,7 +30,6 @@ secrets:
 # ── Cloudflare Tunnel ─────────────────────────────────────────────────────────
 cloudflared:
   enabled: true
-  replicaCount: 1
   image:
     repository: cloudflare/cloudflared
     tag: latest
