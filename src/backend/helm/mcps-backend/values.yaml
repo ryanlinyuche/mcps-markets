@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/your-org/mcps-backend
+  repository: ghcr.io/ryanlinyuche/mcps-backend
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -30,7 +30,6 @@ secrets:
 # ── Cloudflare Tunnel ─────────────────────────────────────────────────────────
 cloudflared:
   enabled: true
-  replicaCount: 1
   image:
     repository: cloudflare/cloudflared
     tag: latest
