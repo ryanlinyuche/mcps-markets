@@ -6,7 +6,7 @@ import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
 const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
-const PROXY_BASE = 'https://studentvuelibtest.up.railway.app'
+const PROXY_BASE = process.env.PROXY_BASE_URL ?? 'https://mcps-markets-api.fizzwizzledazzle.dev'
 
 const escapeXml = (s: string) => s
   .replace(/&/g, '&amp;')
