@@ -131,8 +131,8 @@ export async function POST(request: NextRequest) {
     }
 
     const studentId = String(username).trim()
-    if (!/^\d{6,7}$/.test(studentId)) {
-      return NextResponse.json({ error: 'Student ID must be a 6 or 7 digit number' }, { status: 400 })
+    if (!/(?:^\d{6}$)|(?:^\d{8}$)/.test(studentId)) {
+      return NextResponse.json({ error: 'Student ID must be a 6 or 8 digit number' }, { status: 400 })
     }
 
     let svResult: { valid: boolean; name?: string; encryptedPassword?: string }
