@@ -60,8 +60,8 @@ export default function LoginPage() {
               id="username"
               type="text"
               inputMode="numeric"
-              pattern="\d{6,7}"
-              placeholder="1234567"
+              pattern="(?:^\d{6}$)|(?:^\d{8}$)"
+              placeholder="123456"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
