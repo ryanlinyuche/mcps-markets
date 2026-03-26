@@ -19,77 +19,67 @@ interface FeaturedMarket {
 
 interface HistoryPoint { yes_pool: number; no_pool: number; recorded_at: string }
 
-// ── Inline mini odds chart ────────────────────────────────────────────────────
-function MiniChart({ history, yesPct }: { history: HistoryPoint[]; yesPct: number }) {
-  const W = 500, H = 160, PL = 28, PR = 8, PT = 8, PB = 24
+// ── Clean Polymarket-style chart ──────────────────────────────────────────────
+function OddsChart({ history, yesPct }: { history: HistoryPoint[]; yesPct: number }) {
+  const W = 600, H = 200, PL = 0, PR = 36, PT = 12, PB = 8
 
-  const points = history.length >= 2
-    ? history.map(h => {
-        const t = h.yes_pool + h.no_pool
-        return t === 0 ? 50 : (h.yes_pool / t) * 100
-      })
-    : null
-
-  const color = yesPct >= 60 ? '#16a34a' : yesPct <= 40 ? '#dc2626' : '#4f46e5'
+  const color = yesPct >= 60 ? '#16a34a' : yesPct <= 40 ? '#ef4444' : '#6366f1'
   const colorDark = yesPct >= 60 ? '#38bdf8' : yesPct <= 40 ? '#f97316' : '#818cf8'
-  const gridColor = 'currentColor'
 
-  if (!points) {
+  if (history.length < 2) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground/40 text-xs italic gap-2 min-h-[160px]">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32 opacity-20" preserveAspectRatio="none">
-          <line x1={PL} y1={(PT + H - PB) / 2} x2={W - PR} y2={(PT + H - PB) / 2}
-            stroke="currentColor" strokeWidth="2" strokeDasharray="8,6" />
-        </svg>
-        <span>Chart appears after first bet</span>
+      <div className="flex-1 flex items-center justify-center text-muted-foreground/30 text-xs italic">
+        Chart appears after the first bet
       </div>
     )
   }
 
-  const minV = Math.max(0, Math.min(...points) - 8)
-  const maxV = Math.min(100, Math.max(...points) + 8)
-  const range = Math.max(maxV - minV, 10)
+  const points = history.map(h => {
+    const t = h.yes_pool + h.no_pool
+    return t === 0 ? 50 : (h.yes_pool / t) * 100
+  })
+
+  const minV = Math.max(0, Math.min(...points) - 6)
+  const maxV = Math.min(100, Math.max(...points) + 6)
+  const range = Math.max(maxV - minV, 8)
   const toX = (i: number) => PL + (i / Math.max(points.length - 1, 1)) * (W - PL - PR)
   const toY = (v: number) => PT + ((maxV - v) / range) * (H - PT - PB)
   const last = points[points.length - 1]
+
   const linePath = points.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)} ${toY(v).toFixed(1)}`).join(' ')
   const areaPath = `${linePath} L ${toX(points.length - 1).toFixed(1)} ${H - PB} L ${toX(0).toFixed(1)} ${H - PB} Z`
 
+  // Grid lines — only at meaningful %s that fall within range
+  const gridLines = [20, 35, 50, 65, 80].filter(v => v > minV - 4 && v < maxV + 4)
+
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex justify-between items-center mb-1 px-1">
-        <p className="text-xs text-muted-foreground">YES probability</p>
-        <span className="text-xs font-bold" style={{ color }}>
-          {Math.round(last)}%
-        </span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full flex-1" preserveAspectRatio="none">
-        {[0, 50, 100].map(v => {
-          if (v < minV - 5 || v > maxV + 5) return null
-          const y = toY(v)
-          return (
-            <g key={v}>
-              <line x1={PL - 4} y1={y} x2={W - PR} y2={y}
-                stroke={gridColor} strokeOpacity="0.12" strokeWidth="1"
-                strokeDasharray={v === 50 ? '4,4' : '2,2'} />
-              <text x={PL - 6} y={y + 3.5} textAnchor="end" fontSize="9" fill={gridColor} fillOpacity="0.4">{v}%</text>
-            </g>
-          )
-        })}
-        <path d={areaPath} fill={color} fillOpacity="0.08" className="dark:hidden" />
-        <path d={areaPath} fill={colorDark} fillOpacity="0.12" className="hidden dark:block" />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" className="dark:hidden" />
-        <path d={linePath} fill="none" stroke={colorDark} strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" className="hidden dark:block" />
-        <circle cx={toX(points.length - 1)} cy={toY(last)} r="4" fill={color} className="dark:hidden" />
-        <circle cx={toX(points.length - 1)} cy={toY(last)} r="4" fill={colorDark} className="hidden dark:block" />
-      </svg>
-      <div className="flex justify-between text-[10px] text-muted-foreground/50 px-1 mt-0.5">
-        <span>{history.length} data pts</span>
-        <span>{new Date(history[history.length - 1].recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-      </div>
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+      {/* Subtle grid lines */}
+      {gridLines.map(v => (
+        <g key={v}>
+          <line
+            x1={0} y1={toY(v)} x2={W - PR} y2={toY(v)}
+            stroke="currentColor" strokeOpacity="0.06" strokeWidth="1"
+            strokeDasharray={v === 50 ? '5,4' : '3,4'}
+          />
+          <text x={W - PR + 4} y={toY(v) + 4} fontSize="10" fill="currentColor" fillOpacity="0.35">{v}%</text>
+        </g>
+      ))}
+
+      {/* Area fill */}
+      <path d={areaPath} className="dark:hidden" fill={color} fillOpacity="0.08" />
+      <path d={areaPath} className="hidden dark:block" fill={colorDark} fillOpacity="0.1" />
+
+      {/* Line */}
+      <path d={linePath} fill="none" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"
+        stroke={color} className="dark:hidden" />
+      <path d={linePath} fill="none" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"
+        stroke={colorDark} className="hidden dark:block" />
+
+      {/* End dot */}
+      <circle cx={toX(points.length - 1)} cy={toY(last)} r="4.5" fill={color} className="dark:hidden" />
+      <circle cx={toX(points.length - 1)} cy={toY(last)} r="4.5" fill={colorDark} className="hidden dark:block" />
+    </svg>
   )
 }
 
@@ -107,7 +97,6 @@ export function FeaturedCarousel() {
       .catch(() => {})
   }, [])
 
-  // Fetch history whenever displayed market changes
   useEffect(() => {
     if (!markets[current]) return
     setHistory([])
@@ -147,11 +136,12 @@ export function FeaturedCarousel() {
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-      <div className="flex flex-col sm:flex-row" style={{ minHeight: 320 }}>
 
-        {/* ── Left: sliding carousel ── */}
-        <div className="sm:w-1/2 overflow-hidden border-b sm:border-b-0 sm:border-r border-border flex flex-col">
-          {/* Slide track */}
+      {/* ── Main content row ── */}
+      <div className="flex flex-col sm:flex-row" style={{ minHeight: 280 }}>
+
+        {/* Left: slide track */}
+        <div className="sm:w-5/12 overflow-hidden flex flex-col shrink-0">
           <div
             className="flex flex-1"
             style={{
@@ -161,115 +151,101 @@ export function FeaturedCarousel() {
               willChange: 'transform',
             }}
           >
-            {markets.map((slide, i) => (
-              <div
-                key={slide.id}
-                className="flex flex-col px-6 py-7 space-y-5"
-                style={{ width: `${100 / markets.length}%` }}
-                aria-hidden={i !== current}
-              >
-                {/* Badge */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                    🔥 Featured
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate">{slide.school}</span>
-                </div>
-
-                {/* Title */}
-                <h2 className="text-lg sm:text-xl font-bold leading-snug flex-1 line-clamp-4">{slide.title}</h2>
-
-                {/* Description */}
-                {slide.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 -mt-2">{slide.description}</p>
-                )}
-
-                {/* Odds bar */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm font-bold">
-                    <span className="text-green-600 dark:text-sky-400">YES {Math.round(slide.yes_price * 100)}%</span>
-                    <span className="text-red-500 dark:text-orange-400">NO {100 - Math.round(slide.yes_price * 100)}%</span>
-                  </div>
-                  <div className="h-3 rounded-full bg-muted overflow-hidden flex">
-                    <div className="bg-green-500 dark:bg-sky-500 h-full rounded-l-full transition-all duration-700"
-                      style={{ width: `${Math.round(slide.yes_price * 100)}%` }} />
-                    <div className="bg-red-400 dark:bg-orange-400 h-full rounded-r-full transition-all duration-700"
-                      style={{ width: `${100 - Math.round(slide.yes_price * 100)}%` }} />
-                  </div>
-                </div>
-
-                {/* Meta */}
-                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                  {(slide.yes_pool + slide.no_pool) > 0 && (
-                    <span className="flex items-center gap-1">
-                      <CoinDisplay amount={slide.yes_pool + slide.no_pool} size="sm" /> wagered
-                    </span>
-                  )}
-                  {slide.closes_at && (
-                    <span>Closes {new Date(slide.closes_at).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                    })}</span>
-                  )}
-                  <span>by {slide.creator_name}</span>
-                </div>
-
-                {/* CTA */}
-                <Link
-                  href={`/markets/${slide.id}`}
-                  className="w-full inline-flex items-center justify-center rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all"
-                  tabIndex={i !== current ? -1 : undefined}
+            {markets.map((slide, i) => {
+              const yp = Math.round(slide.yes_price * 100)
+              const np = 100 - yp
+              return (
+                <div
+                  key={slide.id}
+                  className="flex flex-col px-6 pt-6 pb-5 gap-4"
+                  style={{ width: `${100 / markets.length}%` }}
+                  aria-hidden={i !== current}
                 >
-                  View Market →
-                </Link>
-              </div>
-            ))}
-          </div>
+                  {/* Badge + school */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                      🔥 Featured
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">{slide.school}</span>
+                  </div>
 
-          {/* Nav controls */}
-          {markets.length > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <button onClick={prev}
-                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background hover:bg-muted transition-colors"
-                aria-label="Previous">
-                <ChevronLeft size={13} />
-              </button>
-              <div className="flex items-center gap-1.5">
-                {markets.map((_, i) => (
-                  <button key={i} onClick={() => go(i)} aria-label={`Slide ${i + 1}`}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      i === current ? 'bg-primary w-5' : 'bg-muted-foreground/35 w-1.5 hover:bg-muted-foreground/60'
-                    }`} />
-                ))}
-              </div>
-              <button onClick={next}
-                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background hover:bg-muted transition-colors"
-                aria-label="Next">
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          )}
+                  {/* Title */}
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug line-clamp-3 flex-1">
+                    {slide.title}
+                  </h2>
+
+                  {/* YES / NO rows like Polymarket */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between py-1.5 border-b border-border/50">
+                      <span className="text-sm font-medium text-green-700 dark:text-sky-400">YES</span>
+                      <span className="text-sm font-bold">{yp}%</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5">
+                      <span className="text-sm font-medium text-red-600 dark:text-orange-400">NO</span>
+                      <span className="text-sm font-bold">{np}%</span>
+                    </div>
+                  </div>
+
+                  {/* Meta */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {total > 0 && (
+                      <span className="flex items-center gap-1">
+                        <CoinDisplay amount={total} size="sm" /> vol
+                      </span>
+                    )}
+                    {slide.closes_at && (
+                      <span>· {new Date(slide.closes_at).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric',
+                      })}</span>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <Link
+                    href={`/markets/${slide.id}`}
+                    className="self-start text-xs font-semibold text-primary hover:underline"
+                    tabIndex={i !== current ? -1 : undefined}
+                  >
+                    View market →
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        {/* ── Right: odds chart for current market ── */}
-        <div className="sm:w-1/2 flex flex-col px-5 py-6">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            {m.title.length > 48 ? m.title.slice(0, 48) + '…' : m.title}
-          </p>
-          <MiniChart history={history} yesPct={yesPct} />
-          {/* Current odds summary */}
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">YES</p>
-              <p className="text-xl font-bold text-green-600 dark:text-sky-400">{yesPct}%</p>
-              <CoinDisplay amount={m.yes_pool} size="sm" />
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">NO</p>
-              <p className="text-xl font-bold text-red-500 dark:text-orange-400">{noPct}%</p>
-              <CoinDisplay amount={m.no_pool} size="sm" />
-            </div>
-          </div>
+        {/* Right: chart — fills remaining space, no divider line */}
+        <div className="flex-1 flex flex-col min-h-[200px] sm:min-h-0 pt-4 pr-2 pb-2 pl-0 overflow-hidden">
+          <OddsChart history={history} yesPct={yesPct} />
         </div>
+      </div>
+
+      {/* ── Bottom bar: meta + nav ── */}
+      <div className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-muted/30">
+        <span className="text-xs text-muted-foreground">
+          {total > 0 ? <><CoinDisplay amount={total} size="sm" /> wagered</> : 'No bets yet'}
+        </span>
+
+        {markets.length > 1 ? (
+          <div className="flex items-center gap-2">
+            <button onClick={prev} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors" aria-label="Previous">
+              <ChevronLeft size={13} />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {markets.map((_, i) => (
+                <button key={i} onClick={() => go(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? 'bg-primary w-5' : 'bg-muted-foreground/35 w-1.5'}`} />
+              ))}
+            </div>
+            <button onClick={next} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors" aria-label="Next">
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        ) : <div />}
+
+        <Link href={`/markets/${m.id}`} className="text-xs font-semibold text-primary hover:underline">
+          Trade →
+        </Link>
       </div>
     </div>
   )
