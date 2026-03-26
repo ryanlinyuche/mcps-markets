@@ -22,8 +22,8 @@ export async function POST(
     return NextResponse.json({ error: 'Amount must be at least 1 coin' }, { status: 400 })
   }
 
-  const marketRes = await db.execute({ sql: 'SELECT market_type, closes_at FROM markets WHERE id = ?', args: [Number(id)] })
-  const market = marketRes.rows[0] as unknown as { market_type: string; closes_at: string | null } | undefined
+  const marketRes = await db.execute({ sql: 'SELECT market_type, score_subtype, closes_at FROM markets WHERE id = ?', args: [Number(id)] })
+  const market = marketRes.rows[0] as unknown as { market_type: string; score_subtype: string | null; closes_at: string | null } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
@@ -31,8 +31,14 @@ export async function POST(
     return NextResponse.json({ error: 'Betting period has closed for this market' }, { status: 400 })
   }
 
+  // Score markets with letter_grade subtype use option pools (A/B/C/D/F).
+  // Overunder score markets and all other types (yesno, sports, sat_act, teacher_quote) use YES/NO.
+  const isLetterGradeScore =
+    (market.market_type === 'score' || market.market_type === 'personal_score') &&
+    market.score_subtype !== 'overunder'
+
   try {
-    if (market.market_type === 'score' || market.market_type === 'personal_score') {
+    if (isLetterGradeScore) {
       if (!side || typeof side !== 'string') {
         return NextResponse.json({ error: 'Option is required' }, { status: 400 })
       }
