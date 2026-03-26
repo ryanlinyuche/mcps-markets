@@ -71,39 +71,73 @@ export async function PATCH(
       args: [marketId],
     })
     const current = currentRes.rows as unknown as { label: string; amount: number }[]
-    const lockedLabels = current.filter(o => o.amount > 0).map(o => o.label)
 
-    // Ensure no locked label is removed
-    for (const locked of lockedLabels) {
-      if (!newLabels.includes(locked)) {
-        return NextResponse.json(
-          { error: `Cannot remove option "${locked}" which already has bets placed on it` },
-          { status: 400 }
-        )
+    if (isAdmin) {
+      // Admins can edit everything — refund bets for any removed options
+      for (const opt of current) {
+        if (!newLabels.includes(opt.label) && opt.amount > 0) {
+          // Refund all positions that bet on this option
+          const posRes = await db.execute({
+            sql: 'SELECT user_id, coins_bet FROM positions WHERE market_id = ? AND side = ?',
+            args: [marketId, opt.label],
+          })
+          for (const pos of posRes.rows as unknown as { user_id: number; coins_bet: number }[]) {
+            await db.execute({
+              sql: 'UPDATE users SET balance = balance + ? WHERE id = ?',
+              args: [pos.coins_bet, pos.user_id],
+            })
+            await db.execute({
+              sql: `INSERT INTO transactions (user_id, type, amount, market_id, description) VALUES (?, 'refund', ?, ?, 'Option removed by admin')`,
+              args: [pos.user_id, pos.coins_bet, marketId],
+            })
+          }
+          await db.execute({
+            sql: 'DELETE FROM positions WHERE market_id = ? AND side = ?',
+            args: [marketId, opt.label],
+          })
+        }
       }
-    }
 
-    // Delete all unlocked (amount = 0) options
-    await db.execute({
-      sql: 'DELETE FROM option_pools WHERE market_id = ? AND amount = 0',
-      args: [marketId],
-    })
-
-    // Insert all new labels that aren't already locked (locked ones stay)
-    for (let i = 0; i < newLabels.length; i++) {
-      const label = newLabels[i]
-      if (!lockedLabels.includes(label)) {
+      // Delete all current options and re-insert in new order
+      await db.execute({ sql: 'DELETE FROM option_pools WHERE market_id = ?', args: [marketId] })
+      for (let i = 0; i < newLabels.length; i++) {
         await db.execute({
-          sql: 'INSERT OR IGNORE INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',
-          args: [marketId, label, i],
+          sql: 'INSERT INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',
+          args: [marketId, newLabels[i], i],
         })
       }
-      // Update sort_order for locked options to match new list order
-      if (lockedLabels.includes(label)) {
-        await db.execute({
-          sql: 'UPDATE option_pools SET sort_order = ? WHERE market_id = ? AND label = ?',
-          args: [i, marketId, label],
-        })
+    } else {
+      // Non-admin: locked options (with bets) cannot be removed
+      const lockedLabels = current.filter(o => o.amount > 0).map(o => o.label)
+      for (const locked of lockedLabels) {
+        if (!newLabels.includes(locked)) {
+          return NextResponse.json(
+            { error: `Cannot remove option "${locked}" which already has bets placed on it` },
+            { status: 400 }
+          )
+        }
+      }
+
+      // Delete all unlocked (amount = 0) options
+      await db.execute({
+        sql: 'DELETE FROM option_pools WHERE market_id = ? AND amount = 0',
+        args: [marketId],
+      })
+
+      // Insert new labels that aren't already locked; update sort_order for locked ones
+      for (let i = 0; i < newLabels.length; i++) {
+        const label = newLabels[i]
+        if (!lockedLabels.includes(label)) {
+          await db.execute({
+            sql: 'INSERT OR IGNORE INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',
+            args: [marketId, label, i],
+          })
+        } else {
+          await db.execute({
+            sql: 'UPDATE option_pools SET sort_order = ? WHERE market_id = ? AND label = ?',
+            args: [i, marketId, label],
+          })
+        }
       }
     }
   }

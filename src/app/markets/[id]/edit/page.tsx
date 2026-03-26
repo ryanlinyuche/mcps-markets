@@ -317,12 +317,18 @@ export default function EditMarketPage() {
             {showOptions && (
               <div className="space-y-2">
                 <Label>Betting Options</Label>
-                <p className="text-xs text-muted-foreground">
-                  Options with bets (<Lock size={10} className="inline" />) cannot be removed or renamed.
-                </p>
+                {isAdmin ? (
+                  <p className="text-xs text-muted-foreground">
+                    As admin you can edit all options. Removing an option that has bets will <strong>refund</strong> those bets.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Options with bets (<Lock size={10} className="inline" />) cannot be removed or renamed.
+                  </p>
+                )}
                 <div className="space-y-2">
                   {options.map((opt, i) => {
-                    const locked = opt.amount > 0
+                    const locked = !isAdmin && opt.amount > 0
                     return (
                       <div key={i} className="flex items-center gap-2">
                         <div className="relative flex-1">
@@ -331,12 +337,12 @@ export default function EditMarketPage() {
                             onChange={e => updateOptionLabel(i, e.target.value)}
                             placeholder="Option label"
                             disabled={locked}
-                            className={locked ? 'pr-24 opacity-70' : ''}
+                            className={locked ? 'pr-24 opacity-70' : (isAdmin && opt.amount > 0 ? 'pr-20' : '')}
                             maxLength={80}
                           />
-                          {locked && (
+                          {opt.amount > 0 && (
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-muted-foreground">
-                              <Lock size={10} /> {opt.amount} bet{opt.amount !== 1 ? 's' : ''}
+                              {!isAdmin && <Lock size={10} />} {opt.amount} bet{opt.amount !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
