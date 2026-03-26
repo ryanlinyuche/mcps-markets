@@ -46,7 +46,7 @@ export async function Navbar() {
               <InlineSearch />
             </div>
 
-            {/* Right: coins | bell | avatar | hamburger */}
+            {/* Right: coins | bell | avatar | logout (sm+) | hamburger */}
             <div className="flex items-center gap-1 shrink-0">
               <CoinDisplay amount={balance} size="sm" />
               <NotificationBell />
@@ -61,7 +61,10 @@ export async function Navbar() {
                 {initial}
               </Link>
 
-              <LogoutButton />
+              {/* Hide logout on mobile — accessible via side drawer */}
+              <span className="hidden sm:block">
+                <LogoutButton />
+              </span>
 
               {/* Hamburger side drawer: Winners, Leaderboard, Activity, Admin, Theme */}
               <SideDrawer isAdmin={session.isAdmin} />
