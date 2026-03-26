@@ -23,16 +23,26 @@ export async function POST(
   const notes: string | null = resolution_notes?.trim() || null
 
   const marketRes = await db.execute({
-    sql: 'SELECT title, market_type, status, pending_outcome FROM markets WHERE id = ?',
+    sql: 'SELECT title, market_type, status, pending_outcome, team_a, team_b FROM markets WHERE id = ?',
     args: [marketId],
   })
-  const market = marketRes.rows[0] as unknown as { title: string; market_type: string; status: string; pending_outcome: string | null } | undefined
+  const market = marketRes.rows[0] as unknown as {
+    title: string; market_type: string; status: string
+    pending_outcome: string | null; team_a: string | null; team_b: string | null
+  } | undefined
   if (!market) return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   if (market.status !== 'pending_resolution') return NextResponse.json({ error: 'Market is not pending resolution' }, { status: 400 })
   if (!market.pending_outcome) return NextResponse.json({ error: 'No pending outcome to approve' }, { status: 400 })
 
-  const outcome = market.pending_outcome
   const resolvedBy = Number(session.sub)
+
+  // For sports markets, map team name → YES/NO (team_a = YES, team_b = NO)
+  let outcome = market.pending_outcome
+  if (market.market_type === 'sports' && outcome !== 'YES' && outcome !== 'NO' && outcome !== 'N/A') {
+    if (outcome === market.team_a) outcome = 'YES'
+    else if (outcome === market.team_b) outcome = 'NO'
+    else return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 })
+  }
 
   try {
     if (outcome === 'N/A') {

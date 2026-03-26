@@ -226,12 +226,12 @@ export default function ResolvePage() {
       ) : (
         <div className="rounded-lg border p-4 grid grid-cols-2 gap-4 text-center">
           <div>
-            <p className="text-sm text-muted-foreground">YES pool</p>
+            <p className="text-sm text-muted-foreground">{market.team_a ?? 'YES'} pool</p>
             <CoinDisplay amount={market.yes_pool} size="lg" />
             <p className="text-sm text-green-600 font-medium mt-1">{Math.round((market.yes_price ?? 0.5) * 100)}%</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">NO pool</p>
+            <p className="text-sm text-muted-foreground">{market.team_b ?? 'NO'} pool</p>
             <CoinDisplay amount={market.no_pool} size="lg" />
             <p className="text-sm text-red-500 font-medium mt-1">{Math.round((market.no_price ?? 0.5) * 100)}%</p>
           </div>
@@ -317,6 +317,23 @@ export default function ResolvePage() {
                   Resolve: {opt.label}
                 </Button>
               ))}
+            </div>
+          ) : market.market_type === 'sports' && market.team_a && market.team_b ? (
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                className="bg-green-600 hover:bg-green-700 h-16 text-base"
+                onClick={() => handleResolve(market.team_a!)}
+                disabled={loading}
+              >
+                {market.team_a} Wins
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 h-16 text-base"
+                onClick={() => handleResolve(market.team_b!)}
+                disabled={loading}
+              >
+                {market.team_b} Wins
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">

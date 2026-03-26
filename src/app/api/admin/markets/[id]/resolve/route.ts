@@ -47,27 +47,35 @@ export async function POST(
   }
 
   const marketRes = await db.execute({
-    sql: 'SELECT title, market_type FROM markets WHERE id = ?',
+    sql: 'SELECT title, market_type, team_a, team_b FROM markets WHERE id = ?',
     args: [marketId],
   })
-  const market = marketRes.rows[0] as unknown as { title: string; market_type: string } | undefined
+  const market = marketRes.rows[0] as unknown as { title: string; market_type: string; team_a: string | null; team_b: string | null } | undefined
   if (!market) {
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
 
+  // For sports markets, map team name → YES/NO (team_a = YES, team_b = NO)
+  let resolvedOutcome = outcome
+  if (market.market_type === 'sports' && outcome !== 'YES' && outcome !== 'NO' && outcome !== 'N/A') {
+    if (outcome === market.team_a) resolvedOutcome = 'YES'
+    else if (outcome === market.team_b) resolvedOutcome = 'NO'
+    else return NextResponse.json({ error: `Invalid outcome. Expected YES, NO, ${market.team_a}, or ${market.team_b}` }, { status: 400 })
+  }
+
   try {
-    if (outcome === 'N/A') {
+    if (resolvedOutcome === 'N/A') {
       await resolveMarketNA(marketId, resolvedBy, notes)
     } else if (market.market_type === 'score' || market.market_type === 'personal_score') {
-      if (!outcome || typeof outcome !== 'string') {
+      if (!resolvedOutcome || typeof resolvedOutcome !== 'string') {
         return NextResponse.json({ error: 'Outcome is required' }, { status: 400 })
       }
-      await resolveScoreMarket(marketId, outcome, resolvedBy, notes)
+      await resolveScoreMarket(marketId, resolvedOutcome, resolvedBy, notes)
     } else {
-      if (!outcome || !['YES', 'NO'].includes(outcome)) {
-        return NextResponse.json({ error: 'Outcome must be YES or NO' }, { status: 400 })
+      if (!resolvedOutcome || !['YES', 'NO'].includes(resolvedOutcome)) {
+        return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 })
       }
-      await resolveMarket(marketId, outcome as 'YES' | 'NO', resolvedBy, notes)
+      await resolveMarket(marketId, resolvedOutcome as 'YES' | 'NO', resolvedBy, notes)
     }
 
     // Save proof URL if uploaded
@@ -79,7 +87,7 @@ export async function POST(
     }
 
     // Fire-and-forget notifications (non-critical)
-    notifyMarketResolved(marketId, market.title, outcome ?? 'N/A').catch(() => {})
+    notifyMarketResolved(marketId, market.title, resolvedOutcome ?? 'N/A').catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch (error) {
