@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MarketCard } from '@/components/markets/MarketCard'
 import { FeaturedCarousel } from '@/components/markets/FeaturedCarousel'
+import { TopStatsPanel } from '@/components/markets/TopStatsPanel'
 import { Market } from '@/types'
 import { Loader2, PlusCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -99,7 +100,15 @@ export default function AllMarketsPage() {
 
   return (
     <div className="space-y-5">
-      <FeaturedCarousel />
+      {/* Featured + Top Stats side by side */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+        <div className="flex-1 min-w-0">
+          <FeaturedCarousel />
+        </div>
+        <div className="sm:w-56 shrink-0">
+          <TopStatsPanel />
+        </div>
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">

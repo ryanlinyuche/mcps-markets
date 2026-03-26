@@ -9,8 +9,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Daily bonus
-  const usersRes = await db.execute({ sql: 'SELECT id FROM users', args: [] })
+  // Daily bonus — only users who have placed at least 1 bet ever
+  const usersRes = await db.execute({
+    sql: `SELECT DISTINCT u.id FROM users u
+          WHERE EXISTS (SELECT 1 FROM positions p WHERE p.user_id = u.id)`,
+    args: [],
+  })
   const users = usersRes.rows as unknown as { id: number }[]
 
   for (const user of users) {
