@@ -50,7 +50,7 @@ router.post('/fulfillAxios', validate(FulfillSchema), async (req, res) => {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': 'http://edupoint.com/webservices/ProcessWebServiceRequestMultiWeb',
-        'User-Agent': 'StudentVUE/9.1.0 CFNetwork/1474 Darwin/23.0.0',
+        'User-Agent': 'StudentVUE/11.0.0 CFNetwork/1568.300.1 Darwin/24.2.0',
         ...extraHeaders,
       },
       timeout: 30_000,
