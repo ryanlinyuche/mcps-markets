@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, ShieldCheck, RefreshCw } from 'lucide-react'
+import { Loader2, ArrowLeft, ShieldCheck, RefreshCw, Plus, X, Lock } from 'lucide-react'
 import Link from 'next/link'
 
 const SCHOOLS = [
@@ -15,6 +15,12 @@ const SCHOOLS = [
   'Other MCPS School',
   'Sports',
 ]
+
+interface OptionEntry {
+  label: string
+  amount: number   // bets placed on this option
+  isNew?: boolean  // newly added, not yet in DB
+}
 
 interface MarketData {
   id: number
@@ -26,7 +32,9 @@ interface MarketData {
   school: string
   status: string
   market_type: string
+  score_subtype: string | null
   creator_id: number
+  option_pools?: { label: string; amount: number; sort_order: number }[]
 }
 
 interface SessionData {
@@ -51,8 +59,15 @@ export default function EditMarketPage() {
   const [resolutionSource, setResolutionSource] = useState('')
   const [school, setSchool] = useState('')
 
+  // Option pools (for score markets)
+  const [options, setOptions] = useState<OptionEntry[]>([])
+
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
+
+  const hasOptionPools = (m: MarketData) =>
+    (m.market_type === 'score' || m.market_type === 'personal_score') &&
+    m.score_subtype !== 'overunder'
 
   useEffect(() => {
     async function load() {
@@ -67,21 +82,27 @@ export default function EditMarketPage() {
         setMarket(m)
         setSession(s)
 
-        // Pre-fill form
         setTitle(m.title)
         setDescription(m.description ?? '')
         setResolutionCriteria(m.resolution_criteria ?? '')
         setResolutionSource(m.resolution_source ?? '')
         setSchool(m.school)
-        // Convert DB datetime to datetime-local format
         if (m.closes_at) {
           try {
             const d = new Date(m.closes_at)
-            // Format as YYYY-MM-DDTHH:mm for datetime-local
             const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
               .toISOString().slice(0, 16)
             setClosesAt(local)
           } catch { setClosesAt('') }
+        }
+
+        // Pre-fill options
+        if (hasOptionPools(m) && m.option_pools) {
+          setOptions(
+            [...m.option_pools]
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map(op => ({ label: op.label, amount: op.amount }))
+          )
         }
       } catch {
         setLoadError('Failed to load market')
@@ -127,6 +148,20 @@ export default function EditMarketPage() {
     )
   }
 
+  // ── Option pool helpers ────────────────────────────────────────────────────
+  const updateOptionLabel = (idx: number, val: string) => {
+    setOptions(prev => prev.map((o, i) => i === idx ? { ...o, label: val } : o))
+  }
+
+  const removeOption = (idx: number) => {
+    setOptions(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const addOption = () => {
+    setOptions(prev => [...prev, { label: '', amount: 0, isNew: true }])
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim() || title.trim().length < 5) {
@@ -138,19 +173,39 @@ export default function EditMarketPage() {
       return
     }
 
+    // Validate options if applicable
+    if (hasOptionPools(market!)) {
+      const labels = options.map(o => o.label.trim()).filter(Boolean)
+      if (labels.length < 2) {
+        toast.error('Score markets need at least 2 options')
+        return
+      }
+      const unique = new Set(labels)
+      if (unique.size !== labels.length) {
+        toast.error('Option labels must be unique')
+        return
+      }
+    }
+
     setLoading(true)
     try {
+      const body: Record<string, unknown> = {
+        title: title.trim(),
+        description: description.trim() || null,
+        closes_at: closesAt ? new Date(closesAt).toISOString().replace('T', ' ').slice(0, 19) : null,
+        resolution_criteria: resolutionCriteria.trim() || null,
+        resolution_source: resolutionSource.trim() || null,
+        school: isAdmin ? school : undefined,
+      }
+
+      if (hasOptionPools(market!)) {
+        body.options = options.map(o => o.label.trim()).filter(Boolean)
+      }
+
       const res = await fetch(`/api/markets/${marketId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          closes_at: closesAt ? new Date(closesAt).toISOString().replace('T', ' ').slice(0, 19) : null,
-          resolution_criteria: resolutionCriteria.trim() || null,
-          resolution_source: resolutionSource.trim() || null,
-          school: isAdmin ? school : undefined,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -169,6 +224,8 @@ export default function EditMarketPage() {
       setLoading(false)
     }
   }
+
+  const showOptions = hasOptionPools(market)
 
   return (
     <div className="max-w-xl mx-auto">
@@ -255,6 +312,60 @@ export default function EditMarketPage() {
               />
               <p className="text-xs text-muted-foreground">When betting closes on this market.</p>
             </div>
+
+            {/* ── Option pools (score markets only) ── */}
+            {showOptions && (
+              <div className="space-y-2">
+                <Label>Betting Options</Label>
+                <p className="text-xs text-muted-foreground">
+                  Options with bets (<Lock size={10} className="inline" />) cannot be removed or renamed.
+                </p>
+                <div className="space-y-2">
+                  {options.map((opt, i) => {
+                    const locked = opt.amount > 0
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            value={opt.label}
+                            onChange={e => updateOptionLabel(i, e.target.value)}
+                            placeholder="Option label"
+                            disabled={locked}
+                            className={locked ? 'pr-24 opacity-70' : ''}
+                            maxLength={80}
+                          />
+                          {locked && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-muted-foreground">
+                              <Lock size={10} /> {opt.amount} bet{opt.amount !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeOption(i)}
+                          disabled={locked}
+                          className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0 ${
+                            locked
+                              ? 'text-muted-foreground/30 cursor-not-allowed'
+                              : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                          }`}
+                          aria-label="Remove option"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Plus size={14} /> Add option
+                </button>
+              </div>
+            )}
 
             {/* Resolution Criteria */}
             <div className="space-y-1">

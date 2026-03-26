@@ -25,7 +25,7 @@ export async function PATCH(
   if (!isAdmin && !isCreator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (market.status === 'resolved') return NextResponse.json({ error: 'Resolved markets cannot be edited' }, { status: 400 })
 
-  const { title, description, closes_at, resolution_criteria, resolution_source, school } = await request.json()
+  const { title, description, closes_at, resolution_criteria, resolution_source, school, options } = await request.json()
   if (!title?.trim() || title.trim().length < 5) {
     return NextResponse.json({ error: 'Title must be at least 5 characters' }, { status: 400 })
   }
@@ -59,6 +59,53 @@ export async function PATCH(
         marketId,
       ],
     })
+  }
+
+  // ── Update option pools if provided ────────────────────────────────────────
+  if (Array.isArray(options) && options.length >= 2) {
+    const newLabels: string[] = options.map((o: string) => String(o).trim()).filter(Boolean)
+
+    // Get current pools
+    const currentRes = await db.execute({
+      sql: 'SELECT label, amount FROM option_pools WHERE market_id = ?',
+      args: [marketId],
+    })
+    const current = currentRes.rows as unknown as { label: string; amount: number }[]
+    const lockedLabels = current.filter(o => o.amount > 0).map(o => o.label)
+
+    // Ensure no locked label is removed
+    for (const locked of lockedLabels) {
+      if (!newLabels.includes(locked)) {
+        return NextResponse.json(
+          { error: `Cannot remove option "${locked}" which already has bets placed on it` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Delete all unlocked (amount = 0) options
+    await db.execute({
+      sql: 'DELETE FROM option_pools WHERE market_id = ? AND amount = 0',
+      args: [marketId],
+    })
+
+    // Insert all new labels that aren't already locked (locked ones stay)
+    for (let i = 0; i < newLabels.length; i++) {
+      const label = newLabels[i]
+      if (!lockedLabels.includes(label)) {
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO option_pools (market_id, label, amount, sort_order) VALUES (?, ?, 0, ?)',
+          args: [marketId, label, i],
+        })
+      }
+      // Update sort_order for locked options to match new list order
+      if (lockedLabels.includes(label)) {
+        await db.execute({
+          sql: 'UPDATE option_pools SET sort_order = ? WHERE market_id = ? AND label = ?',
+          args: [i, marketId, label],
+        })
+      }
+    }
   }
 
   const updated = await db.execute({ sql: 'SELECT * FROM markets WHERE id = ?', args: [marketId] })
