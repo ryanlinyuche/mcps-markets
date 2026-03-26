@@ -57,11 +57,12 @@ export function FeaturedCarousel() {
         {/* Card shell */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" style={{ minHeight: 320 }}>
 
-          {/* Slide track */}
+          {/* Slide track — total width = N × container width */}
           <div
-            className="flex"
             style={{
-              transform: `translateX(-${current * 100}%)`,
+              display: 'flex',
+              width: `${markets.length * 100}%`,
+              transform: `translateX(-${current * (100 / markets.length)}%)`,
               transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1)',
               willChange: 'transform',
             }}
@@ -74,8 +75,8 @@ export function FeaturedCarousel() {
               return (
                 <div
                   key={m.id}
-                  className="w-full shrink-0 flex flex-col px-6 py-7 space-y-5"
-                  style={{ minHeight: 320 }}
+                  className="flex flex-col px-6 py-7 space-y-5"
+                  style={{ width: `${100 / markets.length}%`, minHeight: 320 }}
                   aria-hidden={i !== current}
                 >
                   {/* Badge */}
