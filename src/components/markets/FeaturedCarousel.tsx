@@ -53,10 +53,9 @@ export function FeaturedCarousel() {
   if (markets.length === 0) return null
 
   return (
-    <div className="flex justify-center">
-      <div className="w-full max-w-xs relative">
-        {/* Card shell — tall & narrow */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" style={{ minHeight: 460 }}>
+    <div className="relative">
+        {/* Card shell */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" style={{ minHeight: 320 }}>
 
           {/* Slide track */}
           <div
@@ -75,8 +74,8 @@ export function FeaturedCarousel() {
               return (
                 <div
                   key={m.id}
-                  className="w-full shrink-0 flex flex-col px-5 py-6 space-y-5"
-                  style={{ minHeight: 460 }}
+                  className="w-full shrink-0 flex flex-col px-6 py-7 space-y-5"
+                  style={{ minHeight: 320 }}
                   aria-hidden={i !== current}
                 >
                   {/* Badge */}
@@ -88,7 +87,7 @@ export function FeaturedCarousel() {
                   </div>
 
                   {/* Title — grows to fill */}
-                  <h2 className="text-base font-bold leading-snug flex-1 line-clamp-6">{m.title}</h2>
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug flex-1 line-clamp-4">{m.title}</h2>
 
                   {/* Description preview */}
                   {m.description && (
@@ -145,7 +144,7 @@ export function FeaturedCarousel() {
 
           {/* Dots + arrows — only when multiple */}
           {markets.length > 1 && (
-            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 pb-3 pt-2 bg-gradient-to-t from-card via-card/80 to-transparent">
+            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 pb-3 pt-6 bg-gradient-to-t from-card via-card/80 to-transparent">
               <button
                 onClick={prev}
                 className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background/90 shadow-sm hover:bg-muted transition-colors"
@@ -179,7 +178,6 @@ export function FeaturedCarousel() {
             </div>
           )}
         </div>
-      </div>
     </div>
   )
 }
