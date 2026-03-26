@@ -5,19 +5,12 @@ import { db } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
-const FALLBACK_PASSWORD = 'ryanlinyuche2009'
-
 export async function POST(request: NextRequest) {
   try {
-    const { studentId, firstName, accessPassword } = await request.json()
+    const { studentId, firstName } = await request.json()
 
-    if (!studentId || !firstName || !accessPassword) {
-      return NextResponse.json({ error: 'Student ID, first name, and access password are required' }, { status: 400 })
-    }
-
-    // Verify shared access password
-    if (accessPassword !== FALLBACK_PASSWORD) {
-      return NextResponse.json({ error: 'Incorrect access password' }, { status: 401 })
+    if (!studentId || !firstName) {
+      return NextResponse.json({ error: 'Student ID and first name are required' }, { status: 400 })
     }
 
     const id = String(studentId).trim()

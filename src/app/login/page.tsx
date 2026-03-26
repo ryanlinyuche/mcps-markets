@@ -13,7 +13,6 @@ export default function LoginPage() {
   // Fallback fields
   const [fbStudentId, setFbStudentId] = useState('')
   const [fbFirstName, setFbFirstName] = useState('')
-  const [fbAccessPassword, setFbAccessPassword] = useState('')
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -49,7 +48,6 @@ export default function LoginPage() {
         body: JSON.stringify({
           studentId: fbStudentId,
           firstName: fbFirstName,
-          accessPassword: fbAccessPassword,
         }),
       })
       const data = await res.json()
@@ -160,7 +158,7 @@ export default function LoginPage() {
           {mode === 'fallback' && (
             <form onSubmit={handleFallback} className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                Only existing accounts can use this login. Ask an admin for the access password.
+                Only existing accounts can use this login.
               </p>
               <div className="space-y-1">
                 <label htmlFor="fb-id" className="text-sm font-medium">Student ID</label>
@@ -183,18 +181,6 @@ export default function LoginPage() {
                   placeholder="e.g. Ryan"
                   value={fbFirstName}
                   onChange={e => setFbFirstName(e.target.value)}
-                  required
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="fb-pw" className="text-sm font-medium">Access Password</label>
-                <input
-                  id="fb-pw"
-                  type="password"
-                  placeholder="••••••••"
-                  value={fbAccessPassword}
-                  onChange={e => setFbAccessPassword(e.target.value)}
                   required
                   className={inputClass}
                 />
