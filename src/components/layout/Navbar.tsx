@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { LogoutButton } from './LogoutButton'
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Trophy } from 'lucide-react'
 import { InlineSearch } from './InlineSearch'
 import { NotificationBell } from './NotificationBell'
 import { SideDrawer } from './SideDrawer'
@@ -46,8 +46,16 @@ export async function Navbar() {
               <InlineSearch />
             </div>
 
-            {/* Right: coins | bell | avatar | logout (sm+) | hamburger */}
+            {/* Right: leaderboard | coins | bell | avatar | logout (sm+) | hamburger */}
             <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href="/leaderboard"
+                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                aria-label="Leaderboard"
+                title="Leaderboard"
+              >
+                <Trophy size={16} className="text-amber-500" />
+              </Link>
               <CoinDisplay amount={balance} size="sm" />
               <NotificationBell />
 

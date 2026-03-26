@@ -150,5 +150,13 @@ export async function register() {
     for (const sql of alterStatements) {
       try { await db.execute(sql) } catch { /* column already exists */ }
     }
+
+    // One-time: reset inactive users (no bets ever) back to 1000 coins
+    await db.execute({
+      sql: `UPDATE users SET balance = 1000
+            WHERE NOT EXISTS (SELECT 1 FROM positions p WHERE p.user_id = users.id)
+              AND balance != 1000`,
+      args: [],
+    })
   }
 }
