@@ -53,9 +53,7 @@ export function FeaturedCarousel() {
   if (markets.length === 0) return null
 
   return (
-    <div className="relative">
-        {/* Card shell */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" style={{ minHeight: 320 }}>
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" style={{ minHeight: 320 }}>
 
           {/* Slide track — total width = N × container width */}
           <div
@@ -143,12 +141,12 @@ export function FeaturedCarousel() {
             })}
           </div>
 
-          {/* Dots + arrows — only when multiple */}
+          {/* Dots + arrows — in normal flow below the slides */}
           {markets.length > 1 && (
-            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 pb-3 pt-6 bg-gradient-to-t from-card via-card/80 to-transparent">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
               <button
                 onClick={prev}
-                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background/90 shadow-sm hover:bg-muted transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background hover:bg-muted transition-colors"
                 aria-label="Previous"
               >
                 <ChevronLeft size={13} />
@@ -171,14 +169,13 @@ export function FeaturedCarousel() {
 
               <button
                 onClick={next}
-                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background/90 shadow-sm hover:bg-muted transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-full border border-border bg-background hover:bg-muted transition-colors"
                 aria-label="Next"
               >
                 <ChevronRight size={13} />
               </button>
             </div>
           )}
-        </div>
     </div>
   )
 }
