@@ -8,6 +8,7 @@ interface FeaturedMarket {
   id: number
   title: string
   description: string | null
+  market_type: string
   yes_pool: number
   no_pool: number
   yes_price: number
@@ -17,10 +18,20 @@ interface FeaturedMarket {
   creator_name: string
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  sports: 'Sports',
+  score: 'Score',
+  personal_score: 'Score',
+  sat_act: 'SAT / ACT',
+  teacher_quote: 'Teacher Quote',
+  custom: 'Custom',
+}
+
 export function FeaturedCarousel() {
   const [markets, setMarkets] = useState<FeaturedMarket[]>([])
   const [current, setCurrent] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countRef = useRef(0)
 
   useEffect(() => {
     fetch('/api/markets/featured')
@@ -29,22 +40,23 @@ export function FeaturedCarousel() {
       .catch(() => {})
   }, [])
 
-  const startTimer = useCallback(() => {
+  const startTimer = useCallback((count: number) => {
     if (timerRef.current) clearInterval(timerRef.current)
+    if (count <= 1) return
     timerRef.current = setInterval(() => {
-      setCurrent(c => (c + 1) % markets.length)
+      setCurrent(c => (c + 1) % count)
     }, 6000)
-  }, [markets.length])
+  }, [])
 
   useEffect(() => {
-    if (markets.length <= 1) return
-    startTimer()
+    countRef.current = markets.length
+    startTimer(markets.length)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [markets.length, startTimer])
 
   const go = useCallback((idx: number) => {
     setCurrent(idx)
-    startTimer()
+    startTimer(countRef.current)
   }, [startTimer])
 
   const prev = () => go((current - 1 + markets.length) % markets.length)
@@ -52,82 +64,92 @@ export function FeaturedCarousel() {
 
   if (markets.length === 0) return null
 
-  const m = markets[current]
-  const yesPct = Math.round(m.yes_price * 100)
-  const noPct = 100 - yesPct
-  const total = m.yes_pool + m.no_pool
+  const n = markets.length
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm flex flex-col" style={{ minHeight: 280 }}>
-
-      {/* ── Slide track ── */}
+    <div
+      className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col"
+      style={{ minHeight: 280 }}
+    >
+      {/* Slide track */}
       <div className="flex-1 overflow-hidden">
         <div
           className="flex h-full"
           style={{
-            width: `${markets.length * 100}%`,
-            transform: `translateX(-${current * (100 / markets.length)}%)`,
-            transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+            width: `${n * 100}%`,
+            transform: `translateX(-${current * (100 / n)}%)`,
+            transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1)',
             willChange: 'transform',
           }}
         >
-          {markets.map((slide, i) => {
-            const yp = Math.round(slide.yes_price * 100)
-            const np = 100 - yp
-            const t = slide.yes_pool + slide.no_pool
+          {markets.map((m, i) => {
+            const yesPct = Math.round(m.yes_price * 100)
+            const noPct = 100 - yesPct
+            const total = m.yes_pool + m.no_pool
+            const typeLabel = TYPE_LABELS[m.market_type] ?? m.market_type
             return (
               <div
-                key={slide.id}
+                key={m.id}
                 className="flex flex-col px-6 pt-6 pb-5 gap-4"
-                style={{ width: `${100 / markets.length}%` }}
+                style={{ width: `${100 / n}%` }}
                 aria-hidden={i !== current}
               >
-                {/* Badge + school */}
-                <div className="flex items-center gap-2">
+                {/* Badges */}
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                     🔥 Featured
                   </span>
-                  <span className="text-xs text-muted-foreground truncate">{slide.school}</span>
+                  {typeLabel && (
+                    <span className="text-xs font-medium px-2.5 py-0.5 rounded-full border border-border text-muted-foreground">
+                      {typeLabel}
+                    </span>
+                  )}
                 </div>
 
                 {/* Title */}
-                <h2 className="text-lg sm:text-xl font-bold leading-snug line-clamp-4 flex-1">
-                  {slide.title}
+                <h2 className="text-lg sm:text-xl font-bold leading-snug line-clamp-3 flex-1">
+                  {m.title}
                 </h2>
 
-                {/* YES / NO rows */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-                    <span className="text-sm font-medium text-green-700 dark:text-sky-400">YES</span>
-                    <span className="text-sm font-bold">{yp}%</span>
+                {/* YES / NO with progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-green-600 dark:text-green-400">YES {yesPct}%</span>
+                    <span className="text-red-500 dark:text-red-400">NO {noPct}%</span>
                   </div>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-sm font-medium text-red-600 dark:text-orange-400">NO</span>
-                    <span className="text-sm font-bold">{np}%</span>
+                  <div className="h-2 rounded-full overflow-hidden bg-muted flex">
+                    <div
+                      className="bg-green-500 rounded-full transition-all duration-500"
+                      style={{ width: `${yesPct}%` }}
+                    />
+                    <div
+                      className="bg-red-400 flex-1 rounded-full"
+                    />
                   </div>
                 </div>
 
                 {/* Meta */}
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                  {t > 0 && (
+                  {total > 0 && (
                     <span className="flex items-center gap-1">
-                      <CoinDisplay amount={t} size="sm" /> vol
+                      <CoinDisplay amount={total} size="sm" /> wagered
                     </span>
                   )}
-                  {slide.closes_at && (
-                    <span>· {new Date(slide.closes_at).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric',
-                    })}</span>
+                  {m.closes_at && (
+                    <span>· Closes {new Date(m.closes_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                  )}
+                  {m.creator_name && (
+                    <span>· by {m.creator_name}</span>
                   )}
                 </div>
 
                 {/* CTA */}
                 <Link
-                  href={`/markets/${slide.id}`}
-                  className="self-start text-xs font-semibold text-primary hover:underline"
+                  href={`/markets/${m.id}`}
                   tabIndex={i !== current ? -1 : undefined}
+                  className="self-start px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                 >
-                  View market →
+                  View Market →
                 </Link>
               </div>
             )
@@ -135,33 +157,37 @@ export function FeaturedCarousel() {
         </div>
       </div>
 
-      {/* ── Bottom bar ── */}
-      <div className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-muted/30">
-        <span className="text-xs text-muted-foreground">
-          {total > 0 ? <><CoinDisplay amount={total} size="sm" /> wagered</> : 'No bets yet'}
-        </span>
-
-        {markets.length > 1 ? (
-          <div className="flex items-center gap-2">
-            <button onClick={prev} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors" aria-label="Previous">
-              <ChevronLeft size={13} />
-            </button>
-            <div className="flex items-center gap-1.5">
-              {markets.map((_, i) => (
-                <button key={i} onClick={() => go(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? 'bg-primary w-5' : 'bg-muted-foreground/35 w-1.5'}`} />
-              ))}
-            </div>
-            <button onClick={next} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors" aria-label="Next">
-              <ChevronRight size={13} />
-            </button>
+      {/* Nav bar */}
+      {n > 1 && (
+        <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-border">
+          <button
+            onClick={prev}
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+            aria-label="Previous"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <div className="flex items-center gap-1.5">
+            {markets.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => go(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === current ? 'bg-primary w-5' : 'bg-muted-foreground/35 w-1.5'
+                }`}
+              />
+            ))}
           </div>
-        ) : <div />}
-
-        <Link href={`/markets/${m.id}`} className="text-xs font-semibold text-primary hover:underline">
-          Trade →
-        </Link>
-      </div>
+          <button
+            onClick={next}
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+            aria-label="Next"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
