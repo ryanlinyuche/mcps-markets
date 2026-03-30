@@ -206,6 +206,18 @@ export async function GET(
     return NextResponse.json({ error: 'Market not found' }, { status: 404 })
   }
 
+  // Gate bubble markets to members only
+  if (market.bubble_id) {
+    if (!session) return NextResponse.json({ error: 'This market is private' }, { status: 403 })
+    const memberRes = await db.execute({
+      sql: 'SELECT 1 FROM bubble_members WHERE bubble_id = ? AND user_id = ?',
+      args: [market.bubble_id, Number(session.sub)],
+    })
+    if (!memberRes.rows[0] && !session.isAdmin) {
+      return NextResponse.json({ error: 'This market is private to bubble members' }, { status: 403 })
+    }
+  }
+
   const { yesPrice, noPrice } = computeOdds(market.yes_pool, market.no_pool)
 
   let optionPools: OptionPool[] | undefined

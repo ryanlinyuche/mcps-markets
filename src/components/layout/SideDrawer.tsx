@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Menu, X, Trophy, BarChart2, User, ShieldCheck, Sun, Moon, Activity } from 'lucide-react'
+import { Menu, X, Trophy, BarChart2, User, ShieldCheck, Sun, Moon, Activity, Layers } from 'lucide-react'
 
 interface SideDrawerProps {
   isAdmin: boolean
@@ -85,6 +85,7 @@ export function SideDrawer({ isAdmin }: SideDrawerProps) {
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           <DrawerItem href="/winners"     icon={<Trophy size={17} />}     label="Winners"     onClick={close} />
           <DrawerItem href="/leaderboard" icon={<BarChart2 size={17} />}  label="Leaderboard" onClick={close} />
+          <DrawerItem href="/bubbles"     icon={<Layers size={17} />}     label="Bubbles"     onClick={close} />
           <DrawerItem href="/activity"    icon={<Activity size={17} />}   label="Activity"    onClick={close} />
           <DrawerItem href="/profile"     icon={<User size={17} />}       label="Profile"     onClick={close} />
           {isAdmin && (

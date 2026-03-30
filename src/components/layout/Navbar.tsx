@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { User } from '@/types'
 import { CoinDisplay } from '@/components/shared/CoinDisplay'
 import { LogoutButton } from './LogoutButton'
-import { TrendingUp, Trophy } from 'lucide-react'
+import { TrendingUp, Trophy, Layers } from 'lucide-react'
 import { InlineSearch } from './InlineSearch'
 import { NotificationBell } from './NotificationBell'
 import { SideDrawer } from './SideDrawer'
@@ -55,6 +55,14 @@ export async function Navbar() {
                 title="Leaderboard"
               >
                 <Trophy size={16} className="text-amber-500" />
+              </Link>
+              <Link
+                href="/bubbles"
+                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors hidden sm:flex"
+                aria-label="Bubbles"
+                title="Bubbles"
+              >
+                <Layers size={16} className="text-purple-500" />
               </Link>
               <CoinDisplay amount={balance} size="sm" />
               <NotificationBell />

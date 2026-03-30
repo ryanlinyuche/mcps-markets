@@ -62,6 +62,8 @@ export interface Market {
   score_subtype?: 'letter_grade' | 'overunder' | null
   score_threshold?: number | null
   comments_restricted?: number | null
+  bubble_id?: number | null
+  bubble_name?: string | null
 }
 
 export interface Position {
@@ -84,6 +86,38 @@ export interface Transaction {
   market_id: number | null
   market_title?: string | null
   description: string | null
+  created_at: string
+}
+
+export interface Bubble {
+  id: number
+  name: string
+  description: string | null
+  creator_id: number
+  invite_code: string
+  starting_balance: number
+  created_at: string
+  member_count?: number
+  my_balance?: number
+  my_role?: 'admin' | 'member'
+}
+
+export interface BubbleMember {
+  bubble_id: number
+  user_id: number
+  name: string
+  student_id?: string
+  balance: number
+  role: 'admin' | 'member'
+  joined_at: string
+}
+
+export interface BubbleJoinRequest {
+  id: number
+  bubble_id: number
+  user_id: number
+  name: string
+  status: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
 

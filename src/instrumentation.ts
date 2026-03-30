@@ -130,6 +130,31 @@ export async function register() {
         added_at   TEXT NOT NULL DEFAULT (datetime('now'))
       )`,
       `CREATE INDEX IF NOT EXISTS idx_comments_market ON comments(market_id)`,
+      `CREATE TABLE IF NOT EXISTS bubbles (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        name             TEXT NOT NULL,
+        description      TEXT,
+        creator_id       INTEGER NOT NULL REFERENCES users(id),
+        invite_code      TEXT NOT NULL UNIQUE,
+        starting_balance INTEGER NOT NULL DEFAULT 1000,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS bubble_members (
+        bubble_id  INTEGER NOT NULL REFERENCES bubbles(id) ON DELETE CASCADE,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        balance    INTEGER NOT NULL,
+        role       TEXT NOT NULL DEFAULT 'member',
+        joined_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (bubble_id, user_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS bubble_join_requests (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        bubble_id  INTEGER NOT NULL REFERENCES bubbles(id) ON DELETE CASCADE,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status     TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (bubble_id, user_id)
+      )`,
     ]
 
     for (const sql of tables) {
@@ -146,6 +171,8 @@ export async function register() {
       `ALTER TABLE markets ADD COLUMN score_threshold INTEGER`,
       `ALTER TABLE users ADD COLUMN comments_banned INTEGER DEFAULT 0`,
       `ALTER TABLE markets ADD COLUMN comments_restricted INTEGER DEFAULT 0`,
+      `ALTER TABLE markets ADD COLUMN bubble_id INTEGER REFERENCES bubbles(id)`,
+      `ALTER TABLE transactions ADD COLUMN bubble_id INTEGER REFERENCES bubbles(id)`,
     ]
     for (const sql of alterStatements) {
       try { await db.execute(sql) } catch { /* column already exists */ }
