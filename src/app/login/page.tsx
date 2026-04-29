@@ -9,6 +9,7 @@ export default function LoginPage() {
   // StudentVUE fields
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
 
   // Fallback fields
   const [fbStudentId, setFbStudentId] = useState('')
@@ -25,7 +26,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, rememberMe }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Login failed'); return }
@@ -139,6 +140,18 @@ export default function LoginPage() {
                   required
                   className={inputClass}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="rememberMe"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                />
+                <label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer select-none">
+                  Remember me for 30 days
+                </label>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <button

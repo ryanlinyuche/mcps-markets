@@ -124,7 +124,7 @@ async function fetchAndStoreSchedule(studentId: string, encryptedPassword: strin
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json()
+    const { username, password, rememberMe } = await request.json()
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Student ID and password are required' }, { status: 400 })
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
     })
     return response
   } catch (error) {
