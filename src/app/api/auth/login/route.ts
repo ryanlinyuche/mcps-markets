@@ -15,31 +15,22 @@ const escapeXml = (s: string) => s
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&apos;')
 
-// Encrypt password via proxy (required by MCPS after their server upgrade)
-async function encryptPassword(password: string): Promise<string> {
-  const res = await fetch(`${PROXY_BASE}/encryptPassword`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
-  })
-  if (!res.ok) throw new Error(`encryptPassword failed: ${res.status}`)
-  const data = await res.json() as { encryptedPassword?: string }
-  if (!data.encryptedPassword) throw new Error('No encryptedPassword in response')
-  return data.encryptedPassword
+const decodeXml = (s: string) => s
+  .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&amp;/g, '&').replace(/&apos;/g, "'")
+
+function buildSoapXml(studentId: string, password: string, methodName: string, paramStr: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
 }
 
-function buildSoapXml(studentId: string, encryptedPassword: string, methodName: string, paramStr: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(encryptedPassword)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
-}
-
-// Send SOAP through proxy with encrypted password
-async function callDistrict(studentId: string, encryptedPassword: string, methodName: string, paramStr: string): Promise<string> {
-  const xml = buildSoapXml(studentId, encryptedPassword, methodName, paramStr)
+// Send SOAP through proxy — proxy handles the MCPS edupointkeyversion cookie
+async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
+  const xml = buildSoapXml(studentId, password, methodName, paramStr)
 
   const res = await fetch(`${PROXY_BASE}/fulfillAxios`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: DISTRICT_URL, xml, encrypted: true }),
+    body: JSON.stringify({ url: DISTRICT_URL, xml }),
   })
 
   const data = await res.json() as { status: boolean; response?: string; message?: string }
@@ -52,9 +43,8 @@ async function callDistrict(studentId: string, encryptedPassword: string, method
   return result
 }
 
-async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string; encryptedPassword?: string }> {
-  const encryptedPassword = await encryptPassword(password)
-  const text = await callDistrict(studentId, encryptedPassword, 'StudentInfo', '<Parms></Parms>')
+async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
+  const text = await callDistrict(studentId, password, 'StudentInfo', '<Parms></Parms>')
 
   console.log('[login] district response sample:', text.slice(0, 300))
 
@@ -62,22 +52,15 @@ async function verifyStudentVue(studentId: string, password: string): Promise<{ 
     return { valid: false }
   }
 
-  const decoded = text
-    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&').replace(/&apos;/g, "'")
-
+  const decoded = decodeXml(text)
   const name = decoded.match(/<FormattedName>([^<]+)<\/FormattedName>/)?.[1]?.trim()
     ?? decoded.match(/<NickName>([^<]+)<\/NickName>/)?.[1]?.trim()
 
   console.log('[login] parsed name:', name)
-  return { valid: true, name, encryptedPassword }
+  return { valid: true, name }
 }
 
 interface ClassPeriodRaw { period: string; course_title: string; teacher: string; room: string; course_code: string }
-
-function decodeXml(s: string) {
-  return s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&apos;/g, "'")
-}
 
 function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
   const periods: ClassPeriodRaw[] = []
@@ -101,9 +84,9 @@ function parsePeriodsFromXml(decoded: string): ClassPeriodRaw[] {
   return periods
 }
 
-async function fetchAndStoreSchedule(studentId: string, encryptedPassword: string, userId: number): Promise<void> {
+async function fetchAndStoreSchedule(studentId: string, password: string, userId: number): Promise<void> {
   try {
-    const result = await callDistrict(studentId, encryptedPassword, 'StudentClassList', '<Parms></Parms>')
+    const result = await callDistrict(studentId, password, 'StudentClassList', '<Parms></Parms>')
     const decoded = decodeXml(result)
     console.log('[schedule] raw xml sample:', decoded.slice(0, 500))
     const periods = parsePeriodsFromXml(decoded)
@@ -135,7 +118,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Student ID must be a 6 or 8 digit number' }, { status: 400 })
     }
 
-    let svResult: { valid: boolean; name?: string; encryptedPassword?: string }
+    // Always verify credentials against StudentVUE — no passwords stored
+    let svResult: { valid: boolean; name?: string }
     try {
       svResult = await verifyStudentVue(studentId, password)
     } catch (err) {
@@ -173,10 +157,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Fire-and-forget schedule fetch
-    if (svResult.encryptedPassword) {
-      fetchAndStoreSchedule(studentId, svResult.encryptedPassword, Number(user.id)).catch(() => {})
-    }
+    // Fire-and-forget schedule fetch (password used transiently, never stored)
+    fetchAndStoreSchedule(studentId, password, Number(user.id)).catch(() => {})
 
     const token = await signToken({
       sub: String(user.id),
