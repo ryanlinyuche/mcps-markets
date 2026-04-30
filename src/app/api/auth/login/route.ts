@@ -27,7 +27,7 @@ async function getEdupointKeyVersion(): Promise<string> {
 
   const key = await webcrypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt'])
   const encrypted = await webcrypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, enc.encode(plaintext))
-  return btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+  return btoa(String.fromCharCode(...Array.from(new Uint8Array(encrypted))))
 }
 
 const escapeXml = (s: string) => s
