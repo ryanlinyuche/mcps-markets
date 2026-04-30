@@ -2,11 +2,10 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { webcrypto } from 'node:crypto'
+import { request as httpsRequest } from 'node:https'
 import { db } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 import { User } from '@/types'
-
-const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
 
 // Reverse-engineered from the StudentVUE APK (same as GradeDurianBackend)
 const EDUPOINT_SECRET = 'b2524efb438b4532b322e633d5aff252'
@@ -46,28 +45,44 @@ function buildSoapXml(studentId: string, password: string, methodName: string, p
   return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequest xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequest></soap:Body></soap:Envelope>`
 }
 
-// Call StudentVUE directly with the generated edupointkeyversion cookie
+// Call StudentVUE directly using node:https so the Cookie header is not silently
+// dropped by Node.js 18's undici (which treats Cookie as a forbidden request header).
 async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
   const edupointKey = await getEdupointKeyVersion()
   const xml = buildSoapXml(studentId, password, methodName, paramStr)
+  const body = Buffer.from(xml, 'utf8')
 
-  const res = await fetch(DISTRICT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/xml',
-      'User-Agent': 'axios/1.10.0',
-      'Cookie': `edupointkeyversion=${edupointKey}`,
-    },
-    body: xml,
+  return new Promise((resolve, reject) => {
+    const req = httpsRequest(
+      {
+        hostname: 'md-mcps-psv.edupoint.com',
+        port: 443,
+        path: '/Service/PXPCommunication.asmx',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml',
+          'User-Agent': 'axios/1.10.0',
+          'Cookie': `edupointkeyversion=${edupointKey}`,
+          'Content-Length': body.length,
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8')
+          console.log('[district] raw response sample:', text.slice(0, 300))
+          const result = text.match(/<ProcessWebServiceRequestResult>([\s\S]*?)<\/ProcessWebServiceRequestResult>/)?.[1]
+          if (!result) return reject(new Error('No ProcessWebServiceRequestResult in response'))
+          resolve(result)
+        })
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.write(body)
+    req.end()
   })
-
-  if (!res.ok) throw new Error(`StudentVUE returned ${res.status}`)
-  const text = await res.text()
-  console.log('[district] raw response sample:', text.slice(0, 300))
-
-  const result = text.match(/<ProcessWebServiceRequestResult>([\s\S]*?)<\/ProcessWebServiceRequestResult>/)?.[1]
-  if (!result) throw new Error('No ProcessWebServiceRequestResult in response')
-  return result
 }
 
 async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
