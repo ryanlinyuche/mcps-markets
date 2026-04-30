@@ -1,12 +1,35 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { webcrypto } from 'node:crypto'
 import { db } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 import { User } from '@/types'
 
 const DISTRICT_URL = 'https://md-mcps-psv.edupoint.com/Service/PXPCommunication.asmx'
-const PROXY_BASE = process.env.PROXY_BASE_URL ?? 'https://mcps-markets-api.fizzwizzledazzle.dev'
+
+// Reverse-engineered from the StudentVUE APK (same as GradeDurianBackend)
+const EDUPOINT_SECRET = 'b2524efb438b4532b322e633d5aff252'
+
+// Generates the edupointkeyversion cookie value required by MCPS.
+// Replicates H0.h() from the StudentVUE APK: AES-CBC encrypt a date-stamped
+// plaintext using the hardcoded EduPoint key, with an IV seeded from "AES".
+async function getEdupointKeyVersion(): Promise<string> {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const dateStr = `${mm}${dd}${now.getFullYear()}`
+  const plaintext = `${dateStr}|8.14.0|${dateStr}|android`
+
+  const enc = new TextEncoder()
+  const keyBytes = enc.encode(EDUPOINT_SECRET)
+  const iv = new Uint8Array(16)
+  enc.encode('AES').forEach((b, i) => { iv[i] = b })
+
+  const key = await webcrypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt'])
+  const encrypted = await webcrypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, enc.encode(plaintext))
+  return btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+}
 
 const escapeXml = (s: string) => s
   .replace(/&/g, '&amp;')
@@ -20,33 +43,36 @@ const decodeXml = (s: string) => s
   .replace(/&amp;/g, '&').replace(/&apos;/g, "'")
 
 function buildSoapXml(studentId: string, password: string, methodName: string, paramStr: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequestMultiWeb xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequestMultiWeb></soap:Body></soap:Envelope>`
+  return `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ProcessWebServiceRequest xmlns="http://edupoint.com/webservices/"><userID>${escapeXml(studentId)}</userID><password>${escapeXml(password)}</password><skipLoginLog>1</skipLoginLog><parent>0</parent><webServiceHandleName>PXPWebServices</webServiceHandleName><methodName>${methodName}</methodName><paramStr>${escapeXml(paramStr)}</paramStr></ProcessWebServiceRequest></soap:Body></soap:Envelope>`
 }
 
-// Send SOAP through proxy — proxy handles the MCPS edupointkeyversion cookie
+// Call StudentVUE directly with the generated edupointkeyversion cookie
 async function callDistrict(studentId: string, password: string, methodName: string, paramStr: string): Promise<string> {
+  const edupointKey = await getEdupointKeyVersion()
   const xml = buildSoapXml(studentId, password, methodName, paramStr)
 
-  const res = await fetch(`${PROXY_BASE}/fulfillAxios`, {
+  const res = await fetch(DISTRICT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: DISTRICT_URL, xml }),
+    headers: {
+      'Content-Type': 'text/xml',
+      'User-Agent': 'axios/1.10.0',
+      'Cookie': `edupointkeyversion=${edupointKey}`,
+    },
+    body: xml,
   })
 
-  const data = await res.json() as { status: boolean; response?: string; message?: string }
-  console.log('[district] proxy status:', data.status, '| sample:', String(data.response ?? data.message ?? '').slice(0, 300))
+  if (!res.ok) throw new Error(`StudentVUE returned ${res.status}`)
+  const text = await res.text()
+  console.log('[district] raw response sample:', text.slice(0, 300))
 
-  if (!data.status || !data.response) throw new Error(`Proxy error: ${data.message ?? 'no response'}`)
-
-  const result = data.response.match(/<ProcessWebServiceRequestMultiWebResult>([\s\S]*?)<\/ProcessWebServiceRequestMultiWebResult>/)?.[1]
-  if (!result) throw new Error('Invalid SOAP response')
+  const result = text.match(/<ProcessWebServiceRequestResult>([\s\S]*?)<\/ProcessWebServiceRequestResult>/)?.[1]
+  if (!result) throw new Error('No ProcessWebServiceRequestResult in response')
   return result
 }
 
 async function verifyStudentVue(studentId: string, password: string): Promise<{ valid: boolean; name?: string }> {
   const text = await callDistrict(studentId, password, 'StudentInfo', '<Parms></Parms>')
-
-  console.log('[login] district response sample:', text.slice(0, 300))
+  console.log('[login] StudentInfo sample:', text.slice(0, 300))
 
   if (text.includes('Invalid user id or password') || text.includes('RT_ERROR')) {
     return { valid: false }
